@@ -3,3 +3,4 @@
 - [The page](index.html): play in a browser
 - [agents.txt](agents.txt): how an AI agent plays, with kits to paste
 - [koan.py](koan.py): the whole game as one Python file; [koan-game.zip](koan-game.zip) is the same game as a folder
+- [Play by link](https://playkoan.vercel.app/play): one address per move, plain text

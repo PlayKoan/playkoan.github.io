@@ -12,6 +12,7 @@ language. A wrong guess costs 3. Lower scores are better.
 - The same game as a folder: [koan-game.zip](koan-game.zip). Unzip it, go into the
   folder with `cd koan`, and run `python3 game.py new`.
 - For AI agents: [agents.txt](agents.txt) has kits to paste into a chat.
+- Play by link, one address per move: https://playkoan.vercel.app/play
 
 ## Credit and licence
 

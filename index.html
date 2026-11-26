@@ -194,8 +194,8 @@ footer { margin-top: 24px; color: var(--muted); font-size: 13px; }
   <p class="note" id="storeNote" hidden>This browser is not saving games: a reload starts the puzzle in the address bar over.</p>
 
   <main>
-<p class="note" id="ways" style="margin:0 0 12px">Ways to play without this page (it needs JavaScript): <a href="koan.py">koan.py</a>, one Python file, run <code class="mono">python3 koan.py new</code>; the same game as a folder, <a href="koan-game.zip">koan-game.zip</a>; AI agents, read <a href="agents.txt">agents.txt</a>.</p>
-<noscript><p class="panel" style="margin:0 0 16px"><b>KOAN needs JavaScript in this page.</b> To play without it, use the terminal game <a href="koan.py">koan.py</a> (one Python file), or the notes for AI agents in <a href="agents.txt">agents.txt</a>. What the game is: see About KOAN below.</p></noscript>
+<p class="note" id="ways" style="margin:0 0 12px">Ways to play without this page (it needs JavaScript): <a href="koan.py">koan.py</a>, one Python file, run <code class="mono">python3 koan.py new</code>; the same game as a folder, <a href="koan-game.zip">koan-game.zip</a>; AI agents, read <a href="agents.txt">agents.txt</a>; play by link, one address per move: <a href="https://playkoan.vercel.app/play">https://playkoan.vercel.app/play</a>.</p>
+<noscript><p class="panel" style="margin:0 0 16px"><b>KOAN needs JavaScript in this page.</b> To play without it, use the terminal game <a href="koan.py">koan.py</a> (one Python file), or the notes for AI agents in <a href="agents.txt">agents.txt</a>, or play by link at <a href="https://playkoan.vercel.app/play">https://playkoan.vercel.app/play</a>. What the game is: see About KOAN below.</p></noscript>
   <div class="grid">
     <div class="col">
       <section class="panel intro" id="intro" aria-label="Introduction">
@@ -362,11 +362,12 @@ footer { margin-top: 24px; color: var(--muted); font-size: 13px; }
     <h2 id="aboutHead">About KOAN</h2>
     <p>KOAN is a puzzle about a hidden rule. The rule says YES or NO to every koan, a row of 1 to 6 digits, each 1 to 4. You see four koans with their answers, test more koans (1 point each), then name the rule in a small word language, such as <code class="mono">has 3</code> or <code class="mono">same ends</code>. A wrong guess costs 3. Lower scores are better.</p>
     <p>A link can name a puzzle, so a friend gets the same one: <code class="mono">#seed=3-48213</code>, <code class="mono">#daily=2026-11-14</code> (the daily follows the GMT date) or <code class="mono">#code=D-WRBD-QM0B-BA50-A67D</code>.</p>
-    <p>Each day has three puzzles, the same for everyone: easy (tier 1), medium (tier 2) and hard (tier 3, the daily). Open New puzzle to play them.</p>
+    <p>Each day has three puzzles, the same for everyone: easy (tier 1), medium (tier 2) and hard (tier 3, the daily). Open New puzzle to play them. Play by link offers the same three.</p>
     <p>Other ways to play, without this page:</p>
     <ul>
       <li><a href="agents.txt">agents.txt</a>: how an AI agent plays, with a short kit to paste into a chat.</li>
       <li><a href="koan.py">koan.py</a>: the whole game as one Python file (standard library only). Run <code class="mono">python3 koan.py new</code>.</li>
+      <li>Play by link, one address per move, no JavaScript: <a href="https://playkoan.vercel.app/play">https://playkoan.vercel.app/play</a></li>
     </ul>
   </section>
   </main>

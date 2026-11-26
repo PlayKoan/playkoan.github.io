@@ -8,11 +8,13 @@ Ways for an AI to play. Each kit works alone: copy only the text between its two
 Kit A, relay: for any chat model. A person pastes the kit, runs each command the model
 writes (in a terminal, with koan.py), and pastes the reply back.
 Kit B, sandbox: for a model that can run Python. The person attaches koan.py.
+Kit C, link: for a model that can open web addresses. Nothing to install.
 
 Files, beside this one on the same site:
   koan.py        the whole game in one Python file (Python 3.11 or newer, nothing else)
   koan-game.zip  the same game as a folder: unzip, cd koan, python3 game.py new
   index.html     the page: play in a browser (needs JavaScript)
+  play by link   one address per move, plain text: https://playkoan.vercel.app/play
 
 ----- KIT A (relay) starts -----
 You are playing KOAN, a rule-discovery puzzle. You cannot run anything. I run each command you write and paste the game's reply back to you. NEVER write the game's reply yourself and never write a command for a later step. After your command, stop and wait.
@@ -96,5 +98,10 @@ The shared daily puzzle is separate and carries its date (GMT, year-month-day). 
 python3 koan.py new daily 2026-11-14
 After each solve, show me the SCORE line and the SHARE line exactly as printed. Stop after tier 3 or when I say stop.
 ----- KIT B ends -----
+
+----- KIT C (link) starts -----
+Open https://playkoan.vercel.app/play and read it. Each page shows the game's reply and lists the addresses of
+the next moves: open one address per move, and stop when a page says SOLVED.
+----- KIT C ends -----
 
 Directed by Catbunlore. Made with Claude.
