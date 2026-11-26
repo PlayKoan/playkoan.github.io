@@ -1,0 +1,2314 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>KOAN, a rule-finding puzzle</title>
+<meta name="description" content="Find a hidden rule about rows of digits. Test rows, then name the rule in a small word language. This page needs JavaScript; without it, and for AI agents, play with koan.py (one Python file) or read agents.txt.">
+<meta property="og:title" content="KOAN, a rule-finding puzzle">
+<meta property="og:description" content="Find a hidden rule about rows of digits. Test rows, then name the rule in a small word language. This page needs JavaScript; without it, and for AI agents, play with koan.py (one Python file) or read agents.txt.">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%233b48c9'/%3E%3Crect x='6' y='18' width='4' height='8' fill='%23fff'/%3E%3Crect x='12' y='10' width='4' height='16' fill='%23fff'/%3E%3Crect x='18' y='14' width='4' height='12' fill='%23fff'/%3E%3Crect x='24' y='6' width='4' height='20' fill='%23fff'/%3E%3C/svg%3E">
+<meta property="og:url" content="https://playkoan.github.io/">
+<link rel="canonical" href="https://playkoan.github.io/">
+<style>
+/* Layout: one working column (board, then the test pad, then the rule console, then the
+   reference), two columns from 900px: the board and pad left, the console and log right.
+   Koans are drawn as bars of height 1 to 4, so order, jumps and repeats can be seen. */
+:root {
+  --bg: #e9ecef;          /* slate paper */
+  --panel: #f7f8f9;
+  --ink: #1b2130;
+  --muted: #586174;
+  --line: #c9cfd8;
+  --accent: #3b48c9;      /* indigo: actions, focus */
+  --accent-ink: #ffffff;
+  --yes: #17766a;         /* teal: the master says YES */
+  --no: #c2541c;          /* burnt orange: NO */
+  --yes-soft: #d5ebe7;
+  --no-soft: #f6e0d3;
+  --warn: #9a6b00;
+  --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --r: 10px;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #11141a; --panel: #191d25; --ink: #e5e8ef; --muted: #9aa2b3; --line: #2d3340;
+  --accent: #8d99ff; --accent-ink: #11141a; --yes: #4cc3b0; --no: #f2894c;
+  --yes-soft: #17322e; --no-soft: #3a2519; --warn: #e2b23f; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #11141a; --panel: #191d25; --ink: #e5e8ef; --muted: #9aa2b3; --line: #2d3340;
+  --accent: #8d99ff; --accent-ink: #11141a; --yes: #4cc3b0; --no: #f2894c;
+  --yes-soft: #17322e; --no-soft: #3a2519; --warn: #e2b23f; color-scheme: dark }
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.5 var(--body); }
+.wrap { max-width: 1120px; margin: 0 auto; padding-block: 18px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+button, input { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+h1, h2, h3 { font-family: var(--display); margin: 0; text-wrap: balance; }
+.label { font-size: 11px; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.mono { font-family: var(--mono); }
+
+/* header */
+header { display: flex; flex-wrap: wrap; align-items: end; gap: 10px 20px; margin-bottom: 16px; }
+.mark { font-family: var(--display); font-weight: 800; font-size: 44px; line-height: .9; letter-spacing: -.02em; }
+.mark small { display: block; font-weight: 500; font-size: 13px; letter-spacing: 0; color: var(--muted); margin-top: 6px; font-family: var(--body); }
+.meta { display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: baseline; margin-left: auto; }
+.stat { display: grid; }
+.stat b { font-family: var(--mono); font-size: 20px; font-variant-numeric: tabular-nums; font-weight: 600; }
+.headbtns { display: flex; gap: 8px; }
+
+.btn { border: 1px solid var(--line); background: var(--panel); border-radius: 8px; padding: 8px 14px; font-weight: 500; }
+.btn:hover { border-color: var(--accent); }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn.quiet { background: transparent; }
+.btn:disabled { opacity: .45; cursor: default; }
+
+.grid { display: grid; gap: 16px; }
+@media (min-width: 900px) { .grid { grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); align-items: start; } }
+.col { display: grid; gap: 16px; min-width: 0; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; min-width: 0; }
+.panel h2 { font-size: 18px; font-weight: 800; }
+.phead { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+
+/* intro strip */
+.intro { border-left: 4px solid var(--accent); }
+.intro p { margin: 0; max-width: 68ch; }
+.intro .row { display: flex; justify-content: space-between; gap: 12px; align-items: start; }
+
+/* the board */
+.board { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.side { border-radius: 8px; padding: 10px; min-width: 0; }
+.side.yes { background: var(--yes-soft); }
+.side.no { background: var(--no-soft); }
+.side h3 { font-size: 15px; font-weight: 800; letter-spacing: .04em; margin-bottom: 8px; display: flex; justify-content: space-between; }
+.side.yes h3 { color: var(--yes); }
+.side.no h3 { color: var(--no); }
+.klist { display: flex; flex-direction: column; gap: 6px; }
+.k { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; }
+.k .tag { font-size: 10px; color: var(--muted); letter-spacing: .06em; text-transform: uppercase; }
+.k .tag::after { content: attr(data-tag); }
+/* Round 13: text only screen readers and page-text tools see. Each koan reads as one line. */
+.sr { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.k.fresh .tiles { animation: pop .6s ease-out; }
+@keyframes pop { from { transform: translateY(-4px); opacity: .3; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .k.fresh .tiles { animation: none; } }
+.tiles { display: inline-flex; gap: 3px; align-items: end; }
+.t { width: 16px; display: grid; justify-items: center; gap: 2px; }
+.t i { display: block; width: 12px; border-radius: 2px 2px 0 0; background: currentColor; opacity: .85; }
+.t::after { content: attr(data-d); font: 600 12px/1 var(--mono); }
+.yes .t { color: var(--yes); }
+.no .t { color: var(--no); }
+.draft .t { color: var(--accent); }
+
+/* test pad */
+.pad { display: grid; gap: 12px; }
+.draftrow { display: flex; align-items: end; gap: 12px; min-height: 52px; padding: 8px 10px; border: 1px dashed var(--line); border-radius: 8px; }
+.draftrow .hint { color: var(--muted); font-size: 13px; }
+.keys { display: grid; grid-template-columns: repeat(4, 1fr) auto; gap: 8px; }
+.key { font: 600 20px var(--mono); padding: 10px 0; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); }
+.key:hover { border-color: var(--accent); }
+.padbtns { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.answer { font-weight: 600; }
+.answer.yes { color: var(--yes); }
+.answer.no { color: var(--no); }
+
+/* rule console */
+.rulebox { display: flex; gap: 8px; flex-wrap: wrap; }
+.rulebox input { flex: 1 1 240px; min-width: 0; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); font-family: var(--mono); font-size: 15px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.chip { border: 1px solid var(--line); background: transparent; border-radius: 999px; padding: 6px 12px; font: 13px var(--mono); }
+.chip:hover { border-color: var(--accent); color: var(--accent); }
+.chip.more { font-family: var(--body); color: var(--muted); }
+.reply { margin-top: 12px; display: grid; gap: 6px; }
+.reply:empty { display: none; }
+.line { display: grid; grid-template-columns: 78px minmax(0, 1fr); gap: 10px; align-items: baseline; }
+.line > .label { padding-top: 2px; }
+.verdict { font-weight: 600; }
+.verdict.ok { color: var(--yes); }
+.verdict.bad { color: var(--no); }
+.note { color: var(--warn); }
+.tries { display: flex; flex-wrap: wrap; gap: 6px; }
+.vs { width: 100%; border-collapse: collapse; font-size: 14px; }
+.vs td { padding: 4px 6px; border-top: 1px solid var(--line); vertical-align: top; }
+.vs td:first-child { font-family: var(--mono); white-space: nowrap; }
+.tablewrap { overflow-x: auto; }
+
+/* end card */
+.card { border: 2px solid var(--accent); }
+.card h2 { font-size: 26px; }
+.card .rule { font: 600 20px var(--mono); margin: 6px 0 2px; overflow-wrap: anywhere; }
+.share { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 10px 12px; background: var(--bg); border-radius: 8px; }
+.share code { font: 14px var(--mono); overflow-wrap: anywhere; flex: 1 1 260px; min-width: 0; }
+.steps { display: flex; flex-wrap: wrap; gap: 6px; }
+.step { font: 12px var(--mono); padding: 2px 8px; border-radius: 6px; background: var(--bg); }
+.step.wrong { color: var(--no); }
+.step.right { color: var(--yes); font-weight: 600; }
+
+/* new puzzle */
+.tiers { display: flex; gap: 6px; flex-wrap: wrap; }
+.tierbtn { min-width: 44px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); font-weight: 600; }
+.tierbtn[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.newgrid { display: grid; gap: 12px; }
+.seedrow { display: flex; gap: 8px; flex-wrap: wrap; }
+.seedrow input { flex: 1 1 200px; min-width: 0; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); font-family: var(--mono); }
+.err { color: var(--no); font-size: 14px; }
+
+/* log and reference */
+.log { display: grid; gap: 4px; font-size: 14px; max-height: 260px; overflow: auto; }
+.log div { display: block; padding-left: 2.8em; text-indent: -2.8em; }
+.log .n { display: inline-block; text-indent: 0; color: var(--muted); font-family: var(--mono); min-width: 2.2em; margin-right: .3em; text-align: right; }
+details { border-top: 1px solid var(--line); padding: 10px 0; }
+details:first-of-type { border-top: 0; }
+summary { cursor: pointer; font-weight: 600; }
+.words { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 14px; margin-top: 10px; font-size: 14px; }
+.words code { font-family: var(--mono); }
+.words button { all: unset; cursor: pointer; font-family: var(--mono); color: var(--accent); }
+.words button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.intro .hint2 { margin-top: 8px; color: var(--muted); font-size: 14px; }
+#about { margin-top: 16px; }
+#about p, #about ul { margin: 6px 0; max-width: 68ch; }
+.tierlist { columns: 2 220px; font: 13px/1.6 var(--mono); margin-top: 8px; }
+.tierlist div { break-inside: avoid; }
+.prose { max-width: 68ch; }
+.prose p { margin: 8px 0; }
+footer { margin-top: 24px; color: var(--muted); font-size: 13px; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <h1 class="mark">KOAN<small>Find the master's hidden rule.</small></h1>
+    <div class="meta" id="meta"></div>
+    <div class="headbtns">
+      <button class="btn" id="newBtn" type="button">New puzzle</button>
+      <button class="btn" id="dealBtn" type="button">Deal</button>
+    </div>
+  </header>
+  <p class="note" id="storeNote" hidden>This browser is not saving games: a reload starts the puzzle in the address bar over.</p>
+
+  <main>
+<p class="note" id="ways" style="margin:0 0 12px">Ways to play without this page (it needs JavaScript): <a href="koan.py">koan.py</a>, one Python file, run <code class="mono">python3 koan.py new</code>; the same game as a folder, <a href="koan-game.zip">koan-game.zip</a>; AI agents, read <a href="agents.txt">agents.txt</a>.</p>
+<noscript><p class="panel" style="margin:0 0 16px"><b>KOAN needs JavaScript in this page.</b> To play without it, use the terminal game <a href="koan.py">koan.py</a> (one Python file), or the notes for AI agents in <a href="agents.txt">agents.txt</a>. What the game is: see About KOAN below.</p></noscript>
+  <div class="grid">
+    <div class="col">
+      <section class="panel intro" id="intro" aria-label="Introduction">
+        <div class="row">
+          <div>
+          <p><b>The master knows a hidden rule</b> that says YES or NO to every koan: a row of 1 to 6
+          digits, each 1, 2, 3 or 4. Test koans of your choice (1 point each), then name the rule in a
+          small word language. A guess wins only if it agrees with the rule on all 5460 koans.
+          Lower scores are better.</p>
+          <p class="hint2">Agents and keyboard users: type digits 1 to 4, then Enter, to test a koan. Type a rule in the rule box: Enter checks it (free), the Guess button guesses. A link can name a puzzle: <span class="mono">#seed=3-48213</span>, <span class="mono">#daily=2026-11-14</span> or <span class="mono">#code=D-...</span>.</p>
+          </div>
+          <button class="btn quiet" id="introClose" type="button" aria-label="Hide the introduction">Hide</button>
+        </div>
+      </section>
+
+      <section class="panel card" id="linkPanel" aria-labelledby="linkHead" hidden>
+        <h2 id="linkHead">Open the linked puzzle?</h2>
+        <p id="linkText" class="prose"></p>
+        <div class="padbtns">
+          <button class="btn primary" id="linkOpen" type="button">Open the linked puzzle</button>
+          <button class="btn" id="linkKeep" type="button">Keep my game</button>
+        </div>
+      </section>
+
+      <section class="panel" id="newPanel" hidden>
+        <div class="phead"><h2>New puzzle</h2><button class="btn quiet" id="newClose" type="button">Close</button></div>
+        <div class="newgrid">
+          <div>
+            <div class="label">Tier</div>
+            <div class="tiers" id="tierBtns" role="group" aria-label="Tier"></div>
+            <p class="label" id="tierNote" style="text-transform:none;letter-spacing:0;font-weight:400;margin:6px 0 0"></p>
+          </div>
+          <div class="padbtns">
+            <button class="btn primary" id="startRandom" type="button">Start a random puzzle</button>
+          </div>
+          <div>
+            <div class="label">Today's puzzles, the same for everyone (GMT date)</div>
+            <div class="padbtns" role="group" aria-label="Today's puzzles">
+              <button class="btn" id="startEasy" type="button">Easy (tier 1)</button>
+              <button class="btn" id="startMedium" type="button">Medium (tier 2)</button>
+              <button class="btn" id="startDaily" type="button">Hard (tier 3)</button>
+            </div>
+          </div>
+          <div>
+            <label class="label" for="seedInput">Or play a seed or a deal code from a friend</label>
+            <div class="seedrow">
+              <input id="seedInput" placeholder="5-44352 or D-H49G-CVV3-GXSR-S3C7" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Seed or deal code">
+              <button class="btn" id="startSeed" type="button">Play it</button>
+            </div>
+            <div class="err" id="seedErr" role="alert"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" id="dealPanel" hidden>
+        <div class="phead"><h2>Deal a puzzle</h2><button class="btn quiet" id="dealClose" type="button">Close</button></div>
+        <div class="newgrid">
+          <p class="prose" style="margin:0">You choose a rule that tier 5 could draw. The apprentice hunts it while you watch, and you get a code a friend can play. Leave the board empty for the game's own start (with a trap), or give four koans: two your rule says YES to and two it says NO to.</p>
+          <div>
+            <label class="label" for="dealRule">Your rule</label>
+            <div class="seedrow"><input id="dealRule" placeholder="same ends or jump" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Your rule"></div>
+          </div>
+          <div>
+            <label class="label" for="dealBoard">Board (optional): four koans</label>
+            <div class="seedrow">
+              <input id="dealBoard" placeholder="1 / 2 2 / 3 4 / 4 2 3" autocomplete="off" spellcheck="false" aria-label="Board, four koans">
+              <button class="btn primary" id="dealGo" type="button">Deal it</button>
+            </div>
+          </div>
+          <div class="reply" id="dealReply" aria-live="polite"></div>
+          <div class="label" id="dealRecord" style="text-transform:none;letter-spacing:0;font-weight:400"></div>
+        </div>
+      </section>
+
+      <section class="panel card" id="card" tabindex="-1" aria-label="End of the puzzle" hidden></section>
+
+      <section class="panel" aria-labelledby="boardHead">
+        <div class="phead"><h2 id="boardHead">The board</h2><span class="label" id="boardCount"></span></div>
+        <p class="sr" id="boardText"></p>
+        <div class="board">
+          <div class="side yes"><h3><span>YES</span> <span class="label" id="yesN"></span></h3><div class="klist" id="yesList" role="list" aria-label="YES koans"></div></div>
+          <div class="side no"><h3><span>NO</span> <span class="label" id="noN"></span></h3><div class="klist" id="noList" role="list" aria-label="NO koans"></div></div>
+        </div>
+      </section>
+
+      <section class="panel" id="padPanel" aria-labelledby="padHead">
+        <div class="phead"><h2 id="padHead">Test a koan</h2><span class="label">1 point each</span></div>
+        <div class="pad">
+          <div class="draftrow draft" id="draft" aria-live="polite"></div>
+          <div class="keys" role="group" aria-label="Digit keys">
+            <button class="key" type="button" data-d="1" aria-label="Digit 1">1</button>
+            <button class="key" type="button" data-d="2" aria-label="Digit 2">2</button>
+            <button class="key" type="button" data-d="3" aria-label="Digit 3">3</button>
+            <button class="key" type="button" data-d="4" aria-label="Digit 4">4</button>
+            <button class="key" type="button" id="back" aria-label="Delete the last digit">&#9003;</button>
+          </div>
+          <div class="padbtns">
+            <button class="btn primary" id="testBtn" type="button">Test it</button>
+            <span id="testReply" aria-live="polite"></span>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="col">
+      <section class="panel" id="rulePanel" aria-labelledby="ruleHead">
+        <div class="phead"><h2 id="ruleHead">Name the rule</h2><span class="label">check is free, a wrong guess costs 3</span></div>
+        <form class="rulebox" id="ruleForm">
+          <input id="ruleInput" placeholder="has 3 and not ends 4" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Rule to check or guess">
+          <button class="btn" id="checkBtn" type="submit">Check</button>
+          <button class="btn primary" id="guessBtn" type="button">Guess</button>
+        </form>
+        <div class="chips" id="chips" role="group" aria-label="Rule words"></div>
+        <div class="reply" id="ruleReply" aria-live="polite"></div>
+      </section>
+
+      <section class="panel" aria-labelledby="movesHead">
+        <div class="phead"><h2 id="movesHead">Moves</h2>
+          <div class="padbtns">
+            <span id="giveupAsk" class="note" aria-live="polite"></span>
+            <button class="btn primary" id="giveupYes" type="button" hidden>Yes, give up</button>
+            <button class="btn quiet" id="giveupNo" type="button" hidden>Keep playing</button>
+            <button class="btn quiet" id="giveupBtn" type="button">Give up</button>
+          </div>
+        </div>
+        <div class="log" id="log" role="log" aria-label="Moves"></div>
+      </section>
+
+      <section class="panel" aria-labelledby="refHead">
+        <h2 id="refHead">Reference</h2>
+        <details>
+          <summary>Words of the rule language</summary>
+          <div class="words" id="words"></div>
+        </details>
+        <details>
+          <summary>How rules join, and what is free</summary>
+          <div class="prose">
+            <p><code class="mono">not X</code>, <code class="mono">X and Y and Z</code> or <code class="mono">X or Y or Z</code>, up to 4 conditions. Never mix and with or in one rule: there are no brackets. Compare rules side by side with <code class="mono">vs</code>: <code class="mono">has 3 vs sum even vs same ends</code>.</p>
+            <p><b>Check</b> is free: it says whether a rule agrees with every koan on the board, and what the rule means. <b>Guess</b>: if your rule disagrees with the board it is bounced, free. If it fits the board but is wrong, it costs 3 and a koan where the two rules differ joins the board. Only the first 10 wrong guesses cost 3.</p>
+            <p>Tiers 1 to 4 draw the hidden rule from the lists below; tiers 1 to 3 never join conditions. A solve at or under par offers the next tier, and you can start any tier at any time.</p>
+          </div>
+        </details>
+        <details>
+          <summary>The tier lists (tiers 1 to 4)</summary>
+          <div id="lists"></div>
+        </details>
+        <details>
+          <summary>Tier 5, the open tier</summary>
+          <div class="prose">
+            <p>The hidden rule is not from a list. With chance 1 in 4 it is one condition of the tier 3 list, with 1 in 2 two of them joined by and, with 1 in 4 two joined by or.</p>
+            <p><b>Weights.</b> Only koans of length 1 to 4 count: a koan of length 1 weighs 64, of length 2 weighs 16, of length 3 weighs 4, of length 4 weighs 1. Each length weighs 256 in all, so everything weighs 1024. A joined rule is drawn only if: (1) its YES koans weigh 205 to 819; (2) it differs from every one-part rule (the conditions of tiers 1 to 3, the not of each, and the nots the lists leave out: not count D exactly 1, not kinds exactly 2 or 3, not more D than E, which are never halves) on koans weighing at least 205; (3) it says YES on at least 2 koans of length 2 to 4, and NO on at least 2.</p>
+            <p><b>Two shortcuts.</b> In A and B, the koans where A says YES weigh at least 410, and so do B's. In A or B, the koans where A says YES and B says NO weigh at least 205, and so do those where B says YES and A says NO.</p>
+            <p>The start has a trap: a condition of tiers 1 to 3, written without not, that fits the four starting koans. It can be one half of the hidden rule, never the whole rule. An apprentice hunts the same puzzle, and the end card shows its score.</p>
+          </div>
+        </details>
+        <details>
+          <summary>Your records in this browser</summary>
+          <div id="records" class="prose"></div>
+        </details>
+      </section>
+    </div>
+  </div>
+  <section class="panel prose" id="about" aria-labelledby="aboutHead">
+    <h2 id="aboutHead">About KOAN</h2>
+    <p>KOAN is a puzzle about a hidden rule. The rule says YES or NO to every koan, a row of 1 to 6 digits, each 1 to 4. You see four koans with their answers, test more koans (1 point each), then name the rule in a small word language, such as <code class="mono">has 3</code> or <code class="mono">same ends</code>. A wrong guess costs 3. Lower scores are better.</p>
+    <p>A link can name a puzzle, so a friend gets the same one: <code class="mono">#seed=3-48213</code>, <code class="mono">#daily=2026-11-14</code> (the daily follows the GMT date) or <code class="mono">#code=D-WRBD-QM0B-BA50-A67D</code>.</p>
+    <p>Each day has three puzzles, the same for everyone: easy (tier 1), medium (tier 2) and hard (tier 3, the daily). Open New puzzle to play them.</p>
+    <p>Other ways to play, without this page:</p>
+    <ul>
+      <li><a href="agents.txt">agents.txt</a>: how an AI agent plays, with a short kit to paste into a chat.</li>
+      <li><a href="koan.py">koan.py</a>: the whole game as one Python file (standard library only). Run <code class="mono">python3 koan.py new</code>.</li>
+    </ul>
+  </section>
+  </main>
+  <footer>KOAN runs entirely in this page. The same seeds and codes give the same puzzles as the terminal game <a href="koan.py">koan.py</a>, one Python file (<span class="mono">python3 koan.py new seed 5-44352</span>). AI agents: read <a href="agents.txt">agents.txt</a>. Your games are kept in this browser only.<br>KOAN. Directed by Catbunlore. Made with Claude.</footer>
+</div>
+
+<script>
+/* KOAN engine for the browser (round 10): a port of engine/ (universe, atoms, lang, tiers,
+   puzzle, solver, deal, apprentice). The same seed, daily date or deal code gives the same
+   puzzle as `python game.py`, and the same verdicts: web/xcheck.js checks it against Python.
+   Masks are bitsets over the 5460 koans (Uint32Array of 171 words, bit i = koan U[i]). */
+(function (root) {
+"use strict";
+
+// ------------------------------------------------------------------ errors
+class UsageError extends Error {
+  constructor(msg, tries) { super(msg); this.tries = tries || []; }
+}
+class InternalError extends Error {}
+
+// ------------------------------------------------------------------ universe
+const DIGITS = [1, 2, 3, 4];
+const U = [];
+for (let L = 1; L <= 6; L++) {
+  const n = 4 ** L;
+  for (let i = 0; i < n; i++) {
+    const t = [];
+    for (let k = L - 1; k >= 0; k--) t.push(Math.floor(i / 4 ** k) % 4 + 1);
+    U.push(t);
+  }
+}
+const N = U.length;                    // 5460
+const W = Math.ceil(N / 32);           // 171 words
+const OFF = {1: 0, 2: 4, 3: 20, 4: 84, 5: 340, 6: 1364};
+const POOL = 340;                      // koans of length 1-4 are indices 0..339
+
+function koanIndex(t) {
+  let i = OFF[t.length];
+  for (let k = 0; k < t.length; k++) i += (t[k] - 1) * 4 ** (t.length - 1 - k);
+  return i;
+}
+const koanText = (t) => t.join(" ");
+
+function popcnt(x) {
+  x -= (x >>> 1) & 0x55555555;
+  x = (x & 0x33333333) + ((x >>> 2) & 0x33333333);
+  return (((x + (x >>> 4)) & 0x0F0F0F0F) * 0x01010101) >>> 24;
+}
+function maskOf(pred) {
+  const m = new Uint32Array(W);
+  for (let i = 0; i < N; i++) if (pred(U[i])) m[i >>> 5] |= 1 << (i & 31);
+  return m;
+}
+const FULL = maskOf(() => true);
+const bit = (m, q) => (m[q >>> 5] >>> (q & 31)) & 1;
+function mand(a, b) { const m = new Uint32Array(W); for (let i = 0; i < W; i++) m[i] = a[i] & b[i]; return m; }
+function mor(a, b) { const m = new Uint32Array(W); for (let i = 0; i < W; i++) m[i] = a[i] | b[i]; return m; }
+function mxor(a, b) { const m = new Uint32Array(W); for (let i = 0; i < W; i++) m[i] = a[i] ^ b[i]; return m; }
+function mnot(a) { return mxor(FULL, a); }
+function meq(a, b) { for (let i = 0; i < W; i++) if (a[i] !== b[i]) return false; return true; }
+function countRange(m, lo, hi) {            // set bits of m in [lo, hi)
+  let c = 0;
+  for (let q = lo; q < hi;) {
+    if ((q & 31) === 0 && q + 32 <= hi) { c += popcnt(m[q >>> 5]); q += 32; }
+    else { c += bit(m, q); q++; }
+  }
+  return c;
+}
+// w4: a koan of length 1, 2, 3, 4 weighs 64, 16, 4, 1 (FULL weighs 1024)
+const w4 = (m) => 64 * countRange(m, 0, 4) + 16 * countRange(m, 4, 20) + 4 * countRange(m, 20, 84) +
+  countRange(m, 84, 340);
+const sCount = (m) => countRange(m, 4, 340);  // koans of length 2-4 (S_MASK)
+function w4xor(a, b) {                        // w4(a ^ b) without building it
+  let c = 0;
+  for (let q = 0; q < 340; q++) {
+    if (((a[q >>> 5] ^ b[q >>> 5]) >>> (q & 31)) & 1) c += q < 4 ? 64 : q < 20 ? 16 : q < 84 ? 4 : 1;
+  }
+  return c;
+}
+function firstDiff(a, b) {
+  for (let i = 0; i < W; i++) {
+    const x = a[i] ^ b[i];
+    if (x) return i * 32 + (31 - Math.clz32(x & -x));
+  }
+  return -1;
+}
+function ones(m, lo = 0, hi = N) {
+  const out = [];
+  for (let q = lo; q < hi; q++) if (bit(m, q)) out.push(q);
+  return out;
+}
+const maskKey = (m) => Array.prototype.join.call(m, ",");
+
+// ------------------------------------------------------------------ atoms (SPEC 3)
+const QUANTS = ["count", "length", "kinds", "sum"];
+const KMAX = {count: 6, length: 6, kinds: 4, sum: 24};
+const DIGIT_KINDS = ["has", "starts", "ends"];
+const NULLARY = ["same ends", "palindrome", "nondecreasing", "nonincreasing", "strictly increasing",
+  "strictly decreasing", "adjacent repeat", "all different", "jump", "zigzag", "grouped",
+  "first is max", "first is min", "last is max", "last is min", "max once", "min once",
+  "last above first", "last below first"];
+
+const pairs = (t) => t.slice(1).map((b, i) => [t[i], b]);
+const cnt = (t, d) => t.filter((x) => x === d).length;
+const NULLARY_PRED = {
+  "same ends": (t) => t[0] === t[t.length - 1],
+  "palindrome": (t) => t.every((x, i) => x === t[t.length - 1 - i]),
+  "nondecreasing": (t) => pairs(t).every(([a, b]) => a <= b),
+  "nonincreasing": (t) => pairs(t).every(([a, b]) => a >= b),
+  "strictly increasing": (t) => pairs(t).every(([a, b]) => a < b),
+  "strictly decreasing": (t) => pairs(t).every(([a, b]) => a > b),
+  "adjacent repeat": (t) => pairs(t).some(([a, b]) => a === b),
+  "all different": (t) => new Set(t).size === t.length,
+  "jump": (t) => pairs(t).some(([a, b]) => Math.abs(a - b) >= 2),
+  "zigzag": (t) => {
+    const p = pairs(t);
+    if (p.some(([a, b]) => a === b)) return false;
+    const ups = p.map(([a, b]) => b > a);
+    return ups.slice(1).every((u, i) => u !== ups[i]);
+  },
+  "grouped": (t) => {
+    const seen = new Set(); let prev = null;
+    for (const x of t) { if (x !== prev) { if (seen.has(x)) return false; seen.add(x); } prev = x; }
+    return true;
+  },
+  "first is max": (t) => t[0] === Math.max(...t),
+  "first is min": (t) => t[0] === Math.min(...t),
+  "last is max": (t) => t[t.length - 1] === Math.max(...t),
+  "last is min": (t) => t[t.length - 1] === Math.min(...t),
+  "max once": (t) => cnt(t, Math.max(...t)) === 1,
+  "min once": (t) => cnt(t, Math.min(...t)) === 1,
+  "last above first": (t) => t[t.length - 1] > t[0],
+  "last below first": (t) => t[t.length - 1] < t[0],
+};
+function quantity(kind, args, t) {
+  if (kind === "count") return cnt(t, args[0]);
+  if (kind === "length") return t.length;
+  if (kind === "kinds") return new Set(t).size;
+  return t.reduce((s, x) => s + x, 0);
+}
+function compare(cmp, k, v) {
+  if (cmp === "atleast") return v >= k;
+  if (cmp === "atmost") return v <= k;
+  if (cmp === "exactly") return v === k;
+  if (cmp === "even") return v % 2 === 0;
+  return v % 2 === 1;
+}
+// an atom is [kind, args]; args of a quantity end with cmp, k (k null for even / odd)
+function holdsAtom(atom, t) {
+  const [kind, args] = atom;
+  if (kind === "has") return t.includes(args[0]);
+  if (kind === "starts") return t[0] === args[0];
+  if (kind === "ends") return t[t.length - 1] === args[0];
+  if (kind === "more") return cnt(t, args[0]) > cnt(t, args[1]);
+  if (kind === "as many") return cnt(t, args[0]) === cnt(t, args[1]);
+  if (QUANTS.includes(kind)) return compare(args[args.length - 2], args[args.length - 1], quantity(kind, args, t));
+  return NULLARY_PRED[kind](t);
+}
+const cmpText = (cmp, k) => (k === null ? cmp : cmp + " " + k);
+function atomText(atom) {
+  const [kind, args] = atom;
+  if (DIGIT_KINDS.includes(kind)) return kind + " " + args[0];
+  if (kind === "more") return "more " + args[0] + " than " + args[1];
+  if (kind === "as many") return "as many " + args[0] + " as " + args[1];
+  if (kind === "count") return "count " + args[0] + " " + cmpText(args[1], args[2]);
+  if (QUANTS.includes(kind)) return kind + " " + cmpText(args[0], args[1]);
+  return kind;
+}
+const GLOSS = {
+  "nondecreasing": "no digit is smaller than the one before (ties allowed)",
+  "nonincreasing": "no digit is larger than the one before (ties allowed)",
+  "palindrome": "reads the same backwards",
+  "adjacent repeat": "two equal digits side by side",
+  "strictly increasing": "each digit is larger than the one before (no ties)",
+  "strictly decreasing": "each digit is smaller than the one before (no ties)",
+  "same ends": "first digit equals last digit",
+  "jump": "two neighbouring digits differ by 2 or more",
+  "all different": "no digit appears twice",
+  "last above first": "last digit is larger than the first",
+  "last below first": "last digit is smaller than the first",
+  "first is max": "no digit is larger than the first",
+  "first is min": "no digit is smaller than the first",
+  "last is max": "no digit is larger than the last",
+  "last is min": "no digit is smaller than the last",
+  "max once": "the largest digit appears exactly once",
+  "min once": "the smallest digit appears exactly once",
+  "grouped": "each digit that appears forms one unbroken block",
+  "zigzag": "no equal neighbours and the steps alternate up and down",
+};
+const NOT_GLOSS = {
+  "nondecreasing": "some digit is smaller than the one before",
+  "nonincreasing": "some digit is larger than the one before",
+  "first is max": "some digit is larger than the first",
+  "first is min": "some digit is smaller than the first",
+  "last is max": "some digit is larger than the last",
+  "last is min": "some digit is smaller than the last",
+  "all different": "some digit appears twice",
+  "zigzag": "two neighbouring digits are equal or two steps in a row both go up or both go down",
+};
+const CMP_GLOSS = {atleast: "is at least %d", atmost: "is at most %d", exactly: "is exactly %d",
+  even: "is even", odd: "is odd"};
+const QUANT_GLOSS = {length: "number of digits", kinds: "number of different digits", sum: "digit sum"};
+function atomGloss(atom) {
+  const [kind, args] = atom;
+  if (kind === "has") return "contains a " + args[0];
+  if (kind === "starts") return "first digit is " + args[0];
+  if (kind === "ends") return "last digit is " + args[0];
+  if (kind === "more") return "more " + args[0] + "s than " + args[1] + "s";
+  if (kind === "as many") return "as many " + args[0] + "s as " + args[1] + "s (zero of each counts)";
+  if (QUANTS.includes(kind)) {
+    const cmp = args[args.length - 2], k = args[args.length - 1];
+    let g = CMP_GLOSS[cmp].replace("%d", k);
+    const head = kind === "count" ? "number of " + args[0] + "s" : QUANT_GLOSS[kind];
+    if (kind === "count" && cmp === "even") g += " (0 is even)";
+    return head + " " + g;
+  }
+  return GLOSS[kind];
+}
+const atomKey = (atom) => atom[0] + "|" + atom[1].join(",");
+const MASKS = new Map();
+function atomMask(atom) {
+  const k = atomKey(atom);
+  let m = MASKS.get(k);
+  if (!m) { m = maskOf((t) => holdsAtom(atom, t)); MASKS.set(k, m); }
+  return m;
+}
+
+// the 62 drawable atoms (SPEC 3.5): {atom, family, genTier, genNot, negText}
+const DRAWABLE = (() => {
+  const rows = [];
+  const add = (atom, family, tier, genNot, negText) => {
+    if (genNot && !negText) negText = "not " + atomText(atom);
+    rows.push({atom, family, genTier: tier, genNot, negText: genNot ? negText : null});
+  };
+  for (const d of DIGITS) add(["has", [d]], "presence", 1, true);
+  for (const d of DIGITS) add(["starts", [d]], "position", 1, true);
+  for (const d of DIGITS) add(["ends", [d]], "position", 1, true);
+  add(["length", ["atleast", 3]], "length", 1, true, "length atmost 2");
+  add(["length", ["even", null]], "length", 1, true, "length odd");
+  add(["sum", ["even", null]], "parity", 1, true, "sum odd");
+  add(["nondecreasing", []], "order", 1, true);
+  add(["nonincreasing", []], "order", 1, true);
+  add(["palindrome", []], "symmetry", 1, true);
+  add(["adjacent repeat", []], "adjacency", 1, true);
+  add(["strictly increasing", []], "order", 2, true);
+  add(["strictly decreasing", []], "order", 2, true);
+  add(["same ends", []], "symmetry", 2, true);
+  add(["jump", []], "adjacency", 2, true);
+  add(["all different", []], "repetition", 2, true);
+  for (const d of DIGITS) add(["count", [d, "atleast", 2]], "count", 2, true, "count " + d + " atmost 1");
+  for (const d of DIGITS) add(["count", [d, "exactly", 1]], "count", 2, false);
+  add(["kinds", ["exactly", 2]], "count", 2, false);
+  add(["kinds", ["exactly", 3]], "count", 2, false);
+  add(["last above first", []], "ends relation", 3, true);
+  add(["last below first", []], "ends relation", 3, true);
+  for (const k of ["first is max", "first is min", "last is max", "last is min", "max once", "min once"])
+    add([k, []], "extremes", 3, true);
+  for (const d of DIGITS) for (const e of DIGITS) if (d !== e) add(["more", [d, e]], "comparison", 3, false);
+  for (let i = 0; i < 4; i++) for (let j = i + 1; j < 4; j++) add(["as many", [DIGITS[i], DIGITS[j]]], "comparison", 3, true);
+  add(["grouped", []], "repetition", 3, true);
+  add(["zigzag", []], "adjacency", 3, true);
+  return rows;
+})();
+
+// ------------------------------------------------------------------ the rule language (SPEC 4)
+const MAX_TOKENS = 40, MAX_LITERALS = 4;
+const NUMBER_WORDS = {zero: "0", one: "1", two: "2", three: "3", four: "4", five: "5", six: "6",
+  ones: "1", twos: "2", threes: "3", fours: "4", "1s": "1", "2s": "2", "3s": "3", "4s": "4"};
+const FILLERS = new Set("a an the is are of with digit digits".split(" "));
+const PHRASES3 = {"first equals last": ["same", "ends"], "first equal last": ["same", "ends"],
+  "last equals first": ["same", "ends"], "last equal first": ["same", "ends"]};
+const PHRASES2 = {"at least": ["atleast"], "at most": ["atmost"], "non decreasing": ["nondecreasing"],
+  "non increasing": ["nonincreasing"], "adjacent repeats": ["adjacent", "repeat"],
+  "adjacent repeated": ["adjacent", "repeat"], "all distinct": ["all", "different"]};
+const SYNONYMS = {contains: ["has"], contain: ["has"], includes: ["has"], include: ["has"],
+  start: ["starts"], begins: ["starts"], begin: ["starts"], end: ["ends"], sorted: ["nondecreasing"],
+  distinct: ["all", "different"], palindromic: ["palindrome"], largest: ["max"], maximum: ["max"],
+  biggest: ["max"], smallest: ["min"], minimum: ["min"], len: ["length"], but: ["and"]};
+const GRAMMAR_WORDS = new Set(("not no without has starts ends first last same palindrome nondecreasing " +
+  "nonincreasing strictly increasing decreasing adjacent repeat all different jump zigzag grouped max " +
+  "min once above below more than as many count length kinds sum even odd atleast atmost exactly " +
+  "and or").split(" "));
+const PHRASE_WORDS = new Set([...Object.keys(PHRASES3), ...Object.keys(PHRASES2)].flatMap((k) => k.split(" ")));
+const KNOWN = [...new Set([...GRAMMAR_WORDS, ...Object.keys(SYNONYMS), ...PHRASE_WORDS])].sort();
+const KNOWN_SET = new Set(KNOWN);
+const NULLARY_WORDS = {palindrome: "palindrome", nondecreasing: "nondecreasing",
+  nonincreasing: "nonincreasing", jump: "jump", zigzag: "zigzag", grouped: "grouped"};
+const CANNOT_START = new Set(["different", "once", "above", "below"]);
+const SYMBOL_TOKENS = new Set(">= => <= =< = == != > < & && | || ! ~".split(" "));
+
+const TIES_UP = [["strictly increasing", "1 1 2 is NO"], ["nondecreasing", "1 1 2 is YES"]];
+const TIES_DOWN = [["strictly decreasing", "2 1 1 is NO"], ["nonincreasing", "2 1 1 is YES"]];
+const REFUSALS = [
+  ["increasing ascending rising", "'%s' is ambiguous about ties", TIES_UP],
+  ["decreasing descending falling", "'%s' is ambiguous about ties", TIES_DOWN],
+  ["monotone monotonic", "'%s' is not a condition here", [["nondecreasing or nonincreasing", ""]]],
+  ["double doubled doubles repeat repeats repeated twice pair pairs consecutive", "'%s' is ambiguous",
+    [["adjacent repeat", "two equal digits side by side"], ["not all different", "some digit appears twice anywhere"]]],
+  ["both", "'%s' is not used. 'not' applies to one condition only.",
+    [["has 1 and has 2", "both"], ["not has 1 or not has 2", "not both"]]],
+  ["unique", "'%s' is ambiguous", [["all different", "no digit appears twice"], ["count 3 exactly 1", "exactly one 3"]]],
+  ["equals equal", "'%s' is only used in 'first equals last'. Amounts use exactly.",
+    [["same ends", "first digit equals last"], ["as many 1 as 2", "equal numbers of 1s and 2s"], ["count 3 exactly 2", ""]]],
+  ["fewer less greater over under exceeds larger bigger higher smaller lower",
+    "'%s' is not used. Compare end digits with last above first or last below first, and counts with more D than E.",
+    [["last above first", "last digit larger than first"], ["more 2 than 1", "more 2s than 1s"], ["count 3 atleast 2", ""]]],
+  ["than", "'%s' is only used in 'more D than E'", [["more 1 than 2", ""]]],
+  ["number amount many", "'%s' is not a word here",
+    [["count 3 atleast 2", "number of 3s"], ["length atleast 4", "number of digits"], ["kinds exactly 2", "number of different digits"]]],
+  ["if then implies unless iff", "there is no if-then: 'if X then Y' is written 'not X or Y'", [["not starts 1 or ends 4", ""]]],
+  ["either xor", "'%s' is not used: 'or' already means at least one", [["has 1 or has 2", ""]]],
+  ["neither nor", "'%s' is not used: 'neither X nor Y' is 'not X and not Y'", [["not has 1 and not has 2", ""]]],
+  ["only except else between", "'%s' is not a word here", [["not has 4", ""], ["count 3 atleast 1 and count 3 atmost 2", ""]]],
+  ["follows followed after before next", "there is no condition about which digit comes next to which",
+    [["adjacent repeat", ""], ["jump", ""]]],
+];
+const REFUSED = new Map();
+for (const [words, msg, tries] of REFUSALS) for (const w of words.split(" ")) REFUSED.set(w, [msg, tries]);
+const checkTries = (pairs) => pairs.map(([r, note]) => ["check " + r, note]);
+function refusal(word) {
+  const [msg, tries] = REFUSED.get(word);
+  return new UsageError(msg.includes("%s") ? msg.replace("%s", word) : msg, checkTries(tries));
+}
+const isDigits = (w) => w !== null && w !== undefined && /^[0-9]+$/.test(w);
+function shorten(w) { return w.length > 20 ? w.slice(0, 17) + "..." : w; }
+function echo(w) { return "'" + shorten(w.replace(/[^A-Za-z0-9_.:=+/-]/g, "?")) + "'"; }
+
+function charError(raw) {
+  if (SYMBOL_TOKENS.has(raw)) return new UsageError("symbols are not used. Write words such as atleast, atmost, exactly, and, or, not.", checkTries([["count 3 atleast 2", ""]]));
+  if (/[()[\]{}]/.test(raw)) return new UsageError("there are no brackets. 'not' applies to one condition.", checkTries([["not has 1 or not has 2", "means not (has 1 and has 2)"]]));
+  if (raw.includes(",")) return new UsageError("do not use commas. Join conditions with and / or.", checkTries([["has 1 and has 2", ""]]));
+  return new UsageError(echo(raw) + " has a character other than a-z or 0-9");
+}
+function lex(text) {
+  const raw = text.split(/[ \t\n\r\f\v]+/).filter((p) => p);
+  if (!raw.length) throw new UsageError("the rule is empty");
+  for (const r of raw) if (!/^[A-Za-z0-9]+(?:[-_][A-Za-z0-9]+)*$/.test(r)) throw charError(r);
+  const words = raw.flatMap((r) => r.toLowerCase().split(/[-_]/));
+  if (words.length > MAX_TOKENS) throw new UsageError("rule is too long (" + words.length + " words, limit " + MAX_TOKENS + ")");
+  let toks = words.map((w) => (Object.prototype.hasOwnProperty.call(NUMBER_WORDS, w) ?
+    {text: NUMBER_WORDS[w], numword: true} : {text: w, numword: false}));
+  toks = toks.filter((t) => !FILLERS.has(t.text));
+  const out = [];
+  for (let i = 0; i < toks.length;) {
+    const k3 = toks.slice(i, i + 3).map((t) => t.text), k2 = k3.slice(0, 2);
+    if (k3.length === 3 && PHRASES3[k3.join(" ")]) { out.push(...PHRASES3[k3.join(" ")].map((w) => ({text: w, numword: false}))); i += 3; }
+    else if (k2.length === 2 && PHRASES2[k2.join(" ")]) { out.push(...PHRASES2[k2.join(" ")].map((w) => ({text: w, numword: false}))); i += 2; }
+    else { out.push(toks[i]); i += 1; }
+  }
+  const fin = [];
+  for (const t of out) {
+    if (Object.prototype.hasOwnProperty.call(SYNONYMS, t.text)) fin.push(...SYNONYMS[t.text].map((w) => ({text: w, numword: false})));
+    else fin.push(t);
+  }
+  return fin;
+}
+
+class Parser {
+  constructor(toks) { this.toks = toks; this.words = toks.map((t) => t.text); this.pos = 0; this.lits = []; }
+  peek(k = 0) { const i = this.pos + k; return i < this.words.length ? this.words[i] : null; }
+  take() { return this.words[this.pos++]; }
+  where() { return this.pos === 0 ? "at the start" : "after '" + this.words.slice(0, this.pos).map(shorten).join(" ") + "'"; }
+  got(w) { return w === null ? "nothing" : echo(w); }
+  fail(error) { const w = this.peek(); if (REFUSED.has(w)) throw refusal(w); throw error; }
+  parse() {
+    const joined = new Set(this.words);
+    if (joined.has("and") && joined.has("or")) throw this.mixed();
+    this.lits.push(this.literal());
+    let op = "single";
+    while (this.peek() !== null) {
+      const w = this.peek();
+      if (w !== "and" && w !== "or") this.fail(new UsageError("expected 'and', 'or' or the end of the rule " + this.where() + ", got " + this.got(w)));
+      op = w; this.take();
+      if (this.lits.length === MAX_LITERALS) throw new UsageError("at most 4 conditions in one rule");
+      this.lits.push(this.literal());
+    }
+    return [op, this.lits];
+  }
+  mixed() {
+    const segs = []; let cur = [];
+    for (const w of this.words) { if (w === "and" || w === "or") { segs.push(cur); cur = []; } else cur.push(w); }
+    segs.push(cur);
+    const texts = segs.map((s) => s.join(" "));
+    const tries = [["and", "all must hold", "X and Y and Z"], ["or", "at least one holds", "X or Y or Z"]].map(
+      ([conn, note, fb]) => [validTry(texts.join(" " + conn + " ")) || fb, note]);
+    return new UsageError("this rule mixes 'and' with 'or'. There are no brackets, so that is ambiguous. Use one kind of connective.", checkTries(tries));
+  }
+  literal() {
+    const w = this.peek();
+    if (w === null || w === "and" || w === "or") throw new UsageError("a condition is missing " + this.where());
+    if (w === "not") { this.take(); const [neg, atom] = this.literal(); return [!neg, atom]; }
+    if (w === "no") {
+      this.take();
+      if (isDigits(this.peek())) return [true, ["has", [this.digit("no")]]];
+      const [neg, atom] = this.literal(); return [!neg, atom];
+    }
+    if (w === "without") { this.take(); return [true, ["has", [this.digit("without")]]]; }
+    return this.atom();
+  }
+  atom() {
+    const w = this.peek();
+    if (REFUSED.has(w)) throw refusal(w);
+    if (isDigits(w)) throw this.bareNumber(w);
+    if (w === "has") {
+      this.take();
+      if (this.peek() === "no") { this.take(); return [true, ["has", [this.digit("has no")]]]; }
+      return [false, this.digitAtom("has", "has")];
+    }
+    if (w === "starts" || w === "ends") { this.take(); return [false, this.digitAtom(w, w)]; }
+    if (w === "first" || w === "last") return [false, this.endAtom(w)];
+    if (w === "same") {
+      this.take();
+      if (this.peek() !== "ends") this.fail(new UsageError("'same' is only used in 'same ends'", checkTries([["same ends", ""]])));
+      this.take(); return [false, ["same ends", []]];
+    }
+    if (Object.prototype.hasOwnProperty.call(NULLARY_WORDS, w)) { this.take(); return [false, [NULLARY_WORDS[w], []]]; }
+    if (w === "strictly") {
+      this.take();
+      const nxt = this.peek();
+      if (nxt !== "increasing" && nxt !== "decreasing") this.fail(new UsageError("'strictly' must be followed by increasing or decreasing"));
+      this.take(); return [false, ["strictly " + nxt, []]];
+    }
+    if (w === "adjacent" || w === "all") {
+      this.take();
+      const want = w === "adjacent" ? "repeat" : "different";
+      if (this.peek() !== want) this.fail(new UsageError("'" + w + "' is only used in '" + w + " " + want + "'"));
+      this.take(); return [false, [w + " " + want, []]];
+    }
+    if (w === "max" || w === "min") {
+      this.take();
+      if (this.peek() !== "once") this.fail(new UsageError("'" + w + "' is only used in first is " + w + ", last is " + w + " and " + w + " once"));
+      this.take(); return [false, [w + " once", []]];
+    }
+    if (w === "more") return [false, this.moreAtom()];
+    if (w === "as") return [false, this.asManyAtom()];
+    if (w === "count") { this.take(); const d = this.digit("count"); return [false, this.quantity("count", [d], "count " + d)]; }
+    if (w === "length" || w === "kinds" || w === "sum") { this.take(); return [false, this.quantity(w, [], w)]; }
+    if (w === "even" || w === "odd") {
+      const nxt = this.peek(1);
+      if (["count", "length", "kinds", "sum"].includes(nxt)) {
+        this.take(); this.take();
+        if (nxt === "count") { const d = this.digit("count"); return [false, ["count", [d, w, null]]]; }
+        return [false, [nxt, [w, null]]];
+      }
+      throw this.cmpMisplaced(w);
+    }
+    if (w === "atleast" || w === "atmost" || w === "exactly") throw this.cmpMisplaced(w);
+    if (CANNOT_START.has(w) || KNOWN_SET.has(w)) throw new UsageError("'" + w + "' cannot start a condition " + this.where());
+    let msg = "unknown word " + echo(w);
+    const close = closeMatch(w, KNOWN, 0.75);
+    if (close) msg += ". Did you mean '" + close + "'?";
+    throw new UsageError(msg);
+  }
+  cmpMisplaced(w) {
+    const ex = ["atleast", "atmost", "exactly"].includes(w) ? "length " + w + " 3" : "length " + w;
+    return new UsageError("'" + w + "' must come after count D, length, kinds or sum", checkTries([[ex, ""]]));
+  }
+  digit(word) {
+    const w = this.peek();
+    if (!isDigits(w)) this.fail(new UsageError("'" + word + "' needs one digit 1-4 " + this.where() + ", got " + this.got(w)));
+    if (w.length === 1) {
+      if (!"1234".includes(w)) throw new UsageError("koans use only the digits 1 2 3 4, got " + echo(w));
+      this.take(); return Number(w);
+    }
+    throw new UsageError("expected one digit 1-4 " + this.where() + ", got " + echo(w));
+  }
+  digitAtom(word, kind) {
+    const tok = this.pos < this.toks.length ? this.toks[this.pos] : null;
+    const w = this.peek();
+    const d14 = (x) => isDigits(x) && x.length === 1 && "1234".includes(x);
+    if (isDigits(w) && w.length === 1) {
+      const nxt = this.peek(1);
+      if (tok.numword && kind === "has" && d14(nxt)) throw this.takesOne(word, kind, [w, nxt], true);
+      if ("1234".includes(w) && d14(nxt)) {
+        const ds = [w]; let k = 1;
+        while (d14(this.peek(k))) { ds.push(this.peek(k)); k++; }
+        throw this.takesOne(word, kind, ds, tok.numword);
+      }
+    } else if (isDigits(w) && w.length >= 2 && w.length <= 4 && [...w].every((c) => "1234".includes(c))) {
+      throw this.takesOne(word, kind, [...w], false);
+    }
+    return [kind, [this.digit(word)]];
+  }
+  takesOne(word, kind, ds, numword) {
+    const msg = "'" + word + "' takes exactly one digit, got '" + ds.join(" ") + "'";
+    const tries = [];
+    if (numword) {
+      if (kind === "has" && ds.length === 2) {
+        const [d, e] = ds;
+        for (const c of ["count " + e + " exactly " + d, "count " + e + " atleast " + d]) if (validTry(c)) tries.push([c, ""]);
+      }
+    } else {
+      for (const conn of kind === "has" ? ["and", "or"] : ["or"]) {
+        const c = ds.map((d) => kind + " " + d).join(" " + conn + " ");
+        if (validTry(c)) tries.push([c, ""]);
+      }
+    }
+    return new UsageError(msg, checkTries(tries));
+  }
+  endAtom(w) {
+    this.take();
+    const nxt = this.peek();
+    if (isDigits(nxt)) return this.digitAtom(w, w === "first" ? "starts" : "ends");
+    if (nxt === "max" || nxt === "min") { this.take(); return [w + " is " + nxt, []]; }
+    if (nxt === "above" || nxt === "below") {
+      this.take();
+      const other = w === "first" ? "last" : "first";
+      if (this.peek() !== other) this.fail(new UsageError("'" + w + " " + nxt + "' must be followed by " + other + " " + this.where() + ", got " + this.got(this.peek())));
+      this.take();
+      if (w === "last") return ["last " + nxt + " first", []];
+      return [nxt === "below" ? "last above first" : "last below first", []];
+    }
+    this.fail(new UsageError("'" + w + "' must be followed by a digit 1-4, max, min, above or below " + this.where() + ", got " + this.got(nxt)));
+  }
+  moreAtom() {
+    this.take();
+    const need = () => this.fail(new UsageError("'more' is used as more D than E " + this.where() + ", got " + this.got(this.peek()), checkTries([["more 1 than 2", ""]])));
+    if (!isDigits(this.peek())) need();
+    const d = this.digit("more");
+    if (this.peek() === "than") this.take();
+    if (!isDigits(this.peek())) need();
+    const e = this.digit("more");
+    if (d === e) throw new UsageError("'more' needs two different digits");
+    return ["more", [d, e]];
+  }
+  asManyAtom() {
+    this.take();
+    const err = new UsageError("'as' is only used in 'as many D as E'", checkTries([["as many 1 as 2", ""]]));
+    if (this.peek() !== "many") this.fail(err);
+    this.take();
+    if (!isDigits(this.peek())) this.fail(err);
+    const d = this.digit("as many");
+    if (this.peek() !== "as") this.fail(err);
+    this.take();
+    if (!isDigits(this.peek())) this.fail(err);
+    const e = this.digit("as many");
+    if (d === e) throw new UsageError("'as many' needs two different digits");
+    return ["as many", [d, e]];
+  }
+  quantity(kind, head, qText) {
+    const w = this.peek();
+    if (w === "atleast" || w === "atmost" || w === "exactly") { this.take(); return [kind, [...head, w, this.number(kind, qText)]]; }
+    if (w === "even" || w === "odd") { this.take(); return [kind, [...head, w, null]]; }
+    if (REFUSED.has(w)) throw refusal(w);
+    let n = 2;
+    if (isDigits(w) && Number(w) <= KMAX[kind]) n = Number(w);
+    const tries = [];
+    for (const c of [qText + " exactly " + n, qText + " atleast " + n, qText + " even"]) if (validTry(c)) tries.push([c, ""]);
+    throw new UsageError("'" + qText + "' must be followed by atleast K, atmost K, exactly K, even or odd, got " + this.got(w), checkTries(tries));
+  }
+  number(kind, qText) {
+    const w = this.peek(), top = KMAX[kind];
+    if (!isDigits(w)) this.fail(new UsageError("expected a number 0-" + top + " " + this.where() + ", got " + this.got(w)));
+    const k = Number(w);
+    if (k > top) throw new UsageError("after '" + qText + "' use a number from 0 to " + top + ", not " + shorten(w.replace(/^0+(?=\d)/, "")));
+    this.take(); return k;
+  }
+  bareNumber(w) {
+    const prev = this.pos > 0 ? this.words[this.pos - 1] : null;
+    if ((prev === "and" || prev === "or") && this.lits.length && DIGIT_KINDS.includes(this.lits[this.lits.length - 1][1][0])) {
+      const [neg, [kind]] = this.lits[this.lits.length - 1];
+      const prefix = (neg ? "not " : "") + kind;
+      const out = [];
+      this.words.forEach((x, i) => {
+        if (i > 0 && (this.words[i - 1] === "and" || this.words[i - 1] === "or") && ["1", "2", "3", "4"].includes(x)) out.push(prefix);
+        out.push(x);
+      });
+      const c = validTry(out.join(" ")) || "has 3";
+      return new UsageError("unexpected number " + echo(w) + " after '" + prev + "'. A number must follow a condition word.", checkTries([[c, ""]]));
+    }
+    const out = [];
+    this.words.forEach((x, i) => {
+      if (["1", "2", "3", "4"].includes(x) && (i === 0 || ["and", "or", "not"].includes(this.words[i - 1]))) out.push("has");
+      out.push(x);
+    });
+    const c = validTry(out.join(" ")) || "has 3";
+    return new UsageError("unexpected number " + echo(w) + ". A number must follow a condition word.", checkTries([[c, ""], ["count 3 atleast 2", ""]]));
+  }
+}
+// difflib's ratio, approximated by the longest common subsequence (only error hints use it)
+function closeMatch(w, words, cutoff) {
+  let best = null, bestR = cutoff;
+  for (const x of words) {
+    const a = w, b = x, dp = Array(b.length + 1).fill(0);
+    for (let i = 1; i <= a.length; i++) {
+      let prev = 0;
+      for (let j = 1; j <= b.length; j++) {
+        const tmp = dp[j];
+        dp[j] = a[i - 1] === b[j - 1] ? prev + 1 : Math.max(dp[j], dp[j - 1]);
+        prev = tmp;
+      }
+    }
+    const r = (2 * dp[b.length]) / (a.length + b.length);
+    if (r >= bestR && (best === null || r > bestR)) { best = x; bestR = r; }
+  }
+  return best;
+}
+function validTry(text) {
+  if (("check " + text).length > 68) return null;
+  try { parseRule(text); } catch (e) { if (e instanceof UsageError) return null; throw e; }
+  return text;
+}
+function parseRule(text) {
+  const p = new Parser(lex(text));
+  try { return p.parse(); } catch (e) {
+    if (e instanceof UsageError) throw e;
+    throw new UsageError("cannot read the rule " + p.where() + ", got " + p.got(p.peek()));
+  }
+}
+const literalText = ([neg, atom]) => (neg ? "not " : "") + atomText(atom);
+const ruleText = ([op, lits]) => lits.map(literalText).join(op === "and" ? " and " : " or ");
+function literalGloss([neg, atom], alone) {
+  const g = neg ? NOT_GLOSS[atom[0]] : atomGloss(atom);
+  if (g === undefined) return "NOT (" + atomGloss(atom) + ")";
+  return alone ? g : "(" + g + ")";
+}
+function ruleGloss([op, lits]) {
+  if (op === "single") return literalGloss(lits[0], true);
+  return lits.map((l) => literalGloss(l, false)).join(op === "and" ? " AND " : " OR ");
+}
+const literalMask = ([neg, atom]) => (neg ? mnot(atomMask(atom)) : atomMask(atom));
+function ruleMask([op, lits]) {
+  let m = literalMask(lits[0]);
+  for (const l of lits.slice(1)) m = op === "and" ? mand(m, literalMask(l)) : mor(m, literalMask(l));
+  return m;
+}
+function unordered([neg, [kind, args]]) {
+  const a = kind === "as many" ? [...args].sort() : args;
+  return (neg ? "not " : "") + atomText([kind, a]);
+}
+
+// ------------------------------------------------------------------ SHA-256, SplitMix64, CRC-32
+function sha256(ascii) {
+  const K = [0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+    0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+    0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+    0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+    0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+    0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+    0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+    0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2];
+  const bytes = [];
+  for (let i = 0; i < ascii.length; i++) bytes.push(ascii.charCodeAt(i) & 0xff);
+  const bitLen = bytes.length * 8;
+  bytes.push(0x80);
+  while (bytes.length % 64 !== 56) bytes.push(0);
+  for (let i = 7; i >= 0; i--) bytes.push(i >= 4 ? 0 : (bitLen >>> (8 * i)) & 0xff);
+  const H = [0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19];
+  const w = new Array(64);
+  const rotr = (x, n) => (x >>> n) | (x << (32 - n));
+  for (let off = 0; off < bytes.length; off += 64) {
+    for (let i = 0; i < 16; i++) w[i] = (bytes[off + 4 * i] << 24) | (bytes[off + 4 * i + 1] << 16) | (bytes[off + 4 * i + 2] << 8) | bytes[off + 4 * i + 3];
+    for (let i = 16; i < 64; i++) {
+      const s0 = rotr(w[i - 15], 7) ^ rotr(w[i - 15], 18) ^ (w[i - 15] >>> 3);
+      const s1 = rotr(w[i - 2], 17) ^ rotr(w[i - 2], 19) ^ (w[i - 2] >>> 10);
+      w[i] = (w[i - 16] + s0 + w[i - 7] + s1) | 0;
+    }
+    let [a, b, c, d, e, f, g, h] = H;
+    for (let i = 0; i < 64; i++) {
+      const S1 = rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25);
+      const t1 = (h + S1 + ((e & f) ^ (~e & g)) + K[i] + w[i]) | 0;
+      const S0 = rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22);
+      const t2 = (S0 + ((a & b) ^ (a & c) ^ (b & c))) | 0;
+      h = g; g = f; f = e; e = (d + t1) | 0; d = c; c = b; b = a; a = (t1 + t2) | 0;
+    }
+    H[0] = (H[0] + a) | 0; H[1] = (H[1] + b) | 0; H[2] = (H[2] + c) | 0; H[3] = (H[3] + d) | 0;
+    H[4] = (H[4] + e) | 0; H[5] = (H[5] + f) | 0; H[6] = (H[6] + g) | 0; H[7] = (H[7] + h) | 0;
+  }
+  return H.map((x) => (x >>> 0).toString(16).padStart(8, "0")).join("");
+}
+const M64 = (1n << 64n) - 1n;
+class SplitMix64 {
+  constructor(seed) { this.s = seed & M64; }
+  next() {
+    this.s = (this.s + 0x9E3779B97F4A7C15n) & M64;
+    let z = this.s;
+    z = ((z ^ (z >> 30n)) * 0xBF58476D1CE4E5B9n) & M64;
+    z = ((z ^ (z >> 27n)) * 0x94D049BB133111EBn) & M64;
+    return z ^ (z >> 31n);
+  }
+  below(n) {
+    if (n <= 0) throw new InternalError("below(" + n + ")");
+    const N64 = 1n << 64n, bn = BigInt(n), limit = N64 - (N64 % bn);
+    for (;;) { const x = this.next(); if (x < limit) return Number(x % bn); }
+  }
+}
+const GEN_VERSION = 1;
+const stream = (label, name) => new SplitMix64(BigInt("0x" + sha256(["KOAN", "v" + GEN_VERSION, label, name].join("|")).slice(0, 16)));
+const CRC_TABLE = (() => {
+  const t = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; }
+  return t;
+})();
+function crc32(bytes) {
+  let c = 0xFFFFFFFF;
+  for (const b of bytes) c = CRC_TABLE[(c ^ b) & 0xff] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+
+// ------------------------------------------------------------------ tiers (SPEC 5)
+const OPEN_TIER = 5;
+const PAR = {1: 3, 2: 3, 3: 4, 4: 5, 5: 9};
+const FLOOR = {1: 3, 2: 4, 3: 4, 4: 4, 5: 0};
+const LIST_SHA256 = "165d2985800f426a98f250fd45daa60ee3efd9109eb1a127d8a88e007d2ae518";
+const SIZES = {1: 19, 2: 62, 3: 106, 4: 146};
+class Entry {
+  constructor(text, family, isNew) { this.text = text; this.family = family; this.isNew = isNew; this.rule = parseRule(text); this._mask = null; }
+  get mask() { if (!this._mask) this._mask = ruleMask(this.rule); return this._mask; }
+}
+function shapeRows() {
+  const rows = [];
+  for (const d of DIGITS) { rows.push(["starts " + d + " or ends " + d, "start or end"]); rows.push(["not starts " + d + " and not ends " + d, "start or end"]); }
+  const combos = []; for (let i = 0; i < 4; i++) for (let j = i + 1; j < 4; j++) combos.push([DIGITS[i], DIGITS[j]]);
+  for (const [d, e] of combos) { rows.push(["has " + d + " and has " + e, "both digits"]); rows.push(["not has " + d + " or not has " + e, "both digits"]); }
+  for (const [d, e] of combos) rows.push(["starts " + d + " or starts " + e, "start set"]);
+  for (const [d, e] of combos) rows.push(["ends " + d + " or ends " + e, "end set"]);
+  rows.push(["nondecreasing or nonincreasing", "monotone"], ["not nondecreasing and not nonincreasing", "monotone"],
+    ["first is max or last is max", "peak at an end"], ["not first is max and not last is max", "peak at an end"],
+    ["first is min or last is min", "trough at an end"], ["not first is min and not last is min", "trough at an end"],
+    ["not adjacent repeat and not jump", "steps of one"], ["adjacent repeat or jump", "steps of one"]);
+  return rows;
+}
+function listTexts() {
+  const out = {1: DRAWABLE.filter((d) => d.genTier === 1).map((d) => [atomText(d.atom), d.family, true])};
+  for (const tier of [2, 3]) {
+    const pos = DRAWABLE.filter((d) => d.genTier <= tier).map((d) => [atomText(d.atom), d.family, d.genTier]);
+    const neg = DRAWABLE.filter((d) => d.genTier <= tier && d.genNot).map((d) => [d.negText, d.family, d.genTier]);
+    out[tier] = [...pos, ...neg].map(([t, f, g]) => [t, f, g === tier]);
+  }
+  out[4] = [...shapeRows().map(([t, f]) => [t, f, true]), ...out[3].map(([t, f]) => [t, f, false])];
+  return out;
+}
+let LISTS = null;
+function getLists() {
+  if (!LISTS) {
+    const texts = listTexts();
+    let s = "";
+    for (const tier of [1, 2, 3, 4]) for (const [t, f, n] of texts[tier]) s += tier + "|" + t + "|" + f + "|" + (n ? 1 : 0) + "\n";
+    if (sha256(s) !== LIST_SHA256) throw new InternalError("hidden-rule lists do not match LIST_SHA256");
+    LISTS = {};
+    for (const tier of [1, 2, 3, 4]) {
+      LISTS[tier] = texts[tier].map(([t, f, n]) => new Entry(t, f, n));
+      if (LISTS[tier].length !== SIZES[tier]) throw new InternalError("list size");
+    }
+  }
+  return LISTS;
+}
+const trapPool = (tier) => DRAWABLE.filter((d) => d.genTier < tier).map((d) => new Entry(atomText(d.atom), d.family, false));
+
+// ------------------------------------------------------------------ puzzles (SPEC 5.4, 6.1)
+const OPEN_GAP = 205;
+let SINGLES = null;
+function singleMasks() {
+  if (!SINGLES) {
+    SINGLES = [];
+    for (const d of DRAWABLE) {
+      const m = atomMask(d.atom);
+      SINGLES.push([atomText(d.atom), m], [d.negText || "not " + atomText(d.atom), mnot(m)]);
+    }
+  }
+  return SINGLES;
+}
+function nearest(m) {              // [d, other, text], the least as Python's min of tuples
+  let best = null;
+  for (const [text, s] of singleMasks()) {
+    const cand = [w4xor(m, s), !meq(m, s), text];
+    if (best === null || cand[0] < best[0] || (cand[0] === best[0] && (cand[1] < best[1] ||
+        (cand[1] === best[1] && cand[2] < best[2])))) best = cand;
+  }
+  return best;
+}
+function openOk(m) {               // open_problem(m) is None, fast
+  const w = w4(m);
+  if (w < OPEN_GAP || w > 1024 - OPEN_GAP) return false;
+  for (const [, s] of singleMasks()) if (w4xor(m, s) < OPEN_GAP) return false;
+  return sCount(m) >= 2 && sCount(mnot(m)) >= 2;
+}
+function openProblem(m) {
+  const w = w4(m);
+  if (w < OPEN_GAP || w > 1024 - OPEN_GAP) return ["band", w];
+  const [d, other, text] = nearest(m);
+  if (d === 0) return other ? ["agrees", text] : ["same", text];
+  if (d < OPEN_GAP) return ["near", text, d];
+  if (sCount(m) < 2 || sCount(mnot(m)) < 2) return ["start", null];
+  return null;
+}
+function openDrawable(m) {
+  const lits = getLists()[3];
+  for (const e of lits) if (meq(e.mask, m)) return ["single", e.text];
+  const problem = openProblem(m);
+  if (problem) return ["no", problem];
+  for (const op of ["and", "or"]) {
+    const cand = lits.filter((e) => (op === "and" ? meq(mand(e.mask, m), m) : meq(mor(e.mask, m), m)));
+    for (let i = 0; i < cand.length; i++) for (let j = i + 1; j < cand.length; j++) {
+      const mm = op === "and" ? mand(cand[i].mask, cand[j].mask) : mor(cand[i].mask, cand[j].mask);
+      if (meq(mm, m)) { const [d, , near] = nearest(m); return [op, cand[i].text, cand[j].text, w4(m), d, near]; }
+    }
+  }
+  return ["no", ["form", null]];
+}
+function drawableWhy(why) {
+  if (why[0] === "band") return "its YES koans weigh " + why[1] + " of 1024, but tier 5 needs " + OPEN_GAP + " to " + (1024 - OPEN_GAP);
+  if (why[0] === "same") return "it is \"" + why[1] + "\", a one-part rule that the tier 3 list leaves out";
+  if (why[0] === "agrees") return "it agrees with \"" + why[1] + "\" on every koan of length 1 to 4";
+  if (why[0] === "near") return "it differs from \"" + why[1] + "\" on koans weighing only " + why[2] + ", but tier 5 needs " + OPEN_GAP;
+  if (why[0] === "start") return "it says YES, or NO, on fewer than 2 koans of length 2 to 4";
+  return "it is not one rule of the tier 3 list or two joined by and or by or";
+}
+function drawOpenRule(label) {
+  const r = stream(label, "rule"), lits = getLists()[3];
+  const kind = r.below(4);
+  if (kind === 0) return new Entry(lits[r.below(lits.length)].text, "open", true);
+  const op = kind <= 2 ? "and" : "or";
+  for (let n = 0; n < 2000; n++) {
+    const a = r.below(lits.length), b = r.below(lits.length);
+    if (a === b) continue;
+    const m = op === "and" ? mand(lits[a].mask, lits[b].mask) : mor(lits[a].mask, lits[b].mask);
+    if (openOk(m)) return new Entry(lits[a].text + " " + op + " " + lits[b].text, "open", true);
+  }
+  throw new InternalError("no open rule found");
+}
+function drawRule(tier, label) {
+  if (tier === OPEN_TIER) return drawOpenRule(label);
+  const r = stream(label, "rule");
+  let rows = getLists()[tier];
+  if (tier >= 2) { const b = r.below(4); rows = rows.filter((e) => e.isNew === (b < 3)); }
+  const fams = [...new Set(rows.map((e) => e.family))].sort();
+  const fam = fams[r.below(fams.length)];
+  const members = rows.filter((e) => e.family === fam);
+  return members[r.below(members.length)];
+}
+const fits = (m, yes, no) => yes.every((q) => bit(m, q)) && !no.some((q) => bit(m, q));
+function eligibleTraps(tier, t) {
+  const feasible = trapPool(tier).filter((T) => !meq(T.mask, t) && sCount(mand(t, T.mask)) >= 2 &&
+    sCount(mnot(mor(t, T.mask))) >= 2);
+  const notT = mnot(t);
+  const narrow = feasible.filter((T) => countRange(mand(T.mask, notT), 0, 340) === 0);
+  if (narrow.length) return narrow;
+  return feasible.filter((T) => w4xor(T.mask, t) >= 103);
+}
+function pickPair(rng, cand) {
+  const a = cand[rng.below(cand.length)];
+  const rest = cand.filter((q) => q !== a);
+  const b = rest[rng.below(rest.length)];
+  return [Math.min(a, b), Math.max(a, b)];
+}
+function starters(tier, label, t) {
+  const rng = stream(label, "start");
+  const masks = getLists()[tier === OPEN_TIER ? 3 : tier].map((e) => e.mask);
+  let traps = null;
+  if (tier >= 2) { traps = eligibleTraps(tier, t); if (!traps.length) throw new InternalError("no eligible trap"); }
+  let best = null;
+  for (let attempt = 1; attempt <= 1000; attempt++) {
+    let trap = null, yes, no;
+    if (traps === null) { yes = pickPair(rng, ones(t, 4, 340)); no = pickPair(rng, ones(mnot(t), 4, 340)); }
+    else {
+      trap = traps[rng.below(traps.length)];
+      yes = pickPair(rng, ones(mand(t, trap.mask), 4, 340));
+      no = pickPair(rng, ones(mnot(mor(t, trap.mask)), 4, 340));
+    }
+    const nFit = masks.filter((m) => fits(m, yes, no)).length;
+    if (nFit >= FLOOR[tier]) return {yes, no, trap, nFit};
+    if (best === null || nFit > best.nFit) best = {yes, no, trap, nFit};
+  }
+  return best;
+}
+const ORDINARY_LABEL = /^([1-5])-[0-9]{5}$/;
+const DAILY_LABEL = /^daily-\d{4}-\d{2}-\d{2}$/;
+function labelTier(label) {
+  const m = ORDINARY_LABEL.exec(label);
+  if (m) return Number(m[1]);
+  if (DAILY_LABEL.test(label)) return 3;
+  if (label.startsWith("D-")) return decode(label) ? OPEN_TIER : null;
+  return null;
+}
+function makePuzzle(label) {
+  const tier = labelTier(label);
+  if (tier === null) throw new UsageError("not a seed, daily or code: " + label);
+  if (label.startsWith("D-")) {
+    const [text, , yes, no] = decode(label);
+    const secret = new Entry(text, "open", true);
+    return {tier, label, secret, yes, no, trap: null};
+  }
+  const secret = drawRule(tier, label);
+  const s = starters(tier, label, secret.mask);
+  return {tier, label, secret, yes: s.yes, no: s.no, trap: s.trap, nFit: s.nFit};
+}
+
+// ------------------------------------------------------------------ solver, crux, escape (SPEC 7)
+// small bitsets over rule indices: Uint32Array; v[i] bit j is rule 32 i + j
+const bsWords = (n) => Math.ceil(n / 32);
+function bsPop(v) { let c = 0; for (let i = 0; i < v.length; i++) c += popcnt(v[i]); return c; }
+function bsAndPop(a, b) { let c = 0; for (let i = 0; i < a.length; i++) c += popcnt(a[i] & b[i]); return c; }
+function bsLow(v) { for (let i = 0; i < v.length; i++) if (v[i]) return i * 32 + (31 - Math.clz32(v[i] & -v[i])); return -1; }
+const SOLVER_COLS = {};
+function solverCols(tier) {
+  if (!SOLVER_COLS[tier]) {
+    const list = getLists()[tier], n = bsWords(list.length);
+    const cols = Array.from({length: POOL}, () => new Uint32Array(n));
+    list.forEach((e, h) => { for (let q = 0; q < POOL; q++) if (bit(e.mask, q)) cols[q][h >>> 5] |= 1 << (h & 31); });
+    SOLVER_COLS[tier] = cols;
+  }
+  return SOLVER_COLS[tier];
+}
+function solve(p) {
+  if (p.tier === OPEN_TIER) return null;
+  const list = getLists()[p.tier], cols = solverCols(p.tier), t = p.secret.mask;
+  const v = new Uint32Array(bsWords(list.length));
+  list.forEach((e, h) => { if (fits(e.mask, p.yes, p.no)) v[h >>> 5] |= 1 << (h & 31); });
+  let steps = 0;
+  while (bsPop(v) > 1) {
+    const nv = bsPop(v);
+    let best = 0, bestQ = -1;
+    for (let q = 0; q < POOL; q++) {
+      const y = bsAndPop(v, cols[q]), s = Math.min(y, nv - y);
+      if (s > best) { best = s; bestQ = q; }
+    }
+    if (bestQ < 0) throw new InternalError("solver cannot split the remaining rules");
+    const c = cols[bestQ], yesAns = bit(t, bestQ);
+    for (let i = 0; i < v.length; i++) v[i] = yesAns ? v[i] & c[i] : v[i] & ~c[i];
+    steps++;
+  }
+  return steps;
+}
+function crux(p) {
+  if (p.tier === OPEN_TIER) return null;
+  const t = p.secret.mask;
+  const others = getLists()[p.tier].filter((e) => !meq(e.mask, t) && fits(e.mask, p.yes, p.no)).map((e) => e.mask);
+  const board = new Set([...p.yes, ...p.no]);
+  let best = -1, bestQ = null;
+  for (let q = 0; q < POOL; q++) {
+    if (board.has(q)) continue;
+    const tv = bit(t, q);
+    const k = others.filter((m) => bit(m, q) !== tv).length;
+    if (k > best) { best = k; bestQ = q; }
+  }
+  return [bestQ, best, others.length];
+}
+const escapeKoan = (p) => (p.trap ? firstDiff(p.trap.mask, p.secret.mask) : null);
+
+// ------------------------------------------------------------------ deal codes (round 7)
+const ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+const DEAL_LABEL = /^D(?:-[0-9A-HJKMNP-TV-Z]{4}){4}$/;
+const KINDS = ["single", "and", "or"];
+const BITS = 80n, M80 = (1n << 80n) - 1n, KMIX = 0x9E3779B97F4A7C15F39Dn, SHIFT = 37n;
+const KINV = (() => { let x = KMIX; for (let i = 0; i < 7; i++) x = (x * (2n - KMIX * x)) & M80; return x; })();
+function mix(x) { for (let i = 0; i < 3; i++) { x = (x * KMIX) & M80; x ^= x >> SHIFT; } return x; }
+function unmix(x) { for (let i = 0; i < 3; i++) { x ^= (x >> SHIFT) ^ (x >> (2n * SHIFT)); x = (x * KINV) & M80; } return x; }
+function bytes9(v) { const b = []; for (let i = 8; i >= 0; i--) b.push(Number((v >> BigInt(8 * i)) & 0xFFn)); return b; }
+function encode(kind, a, b, koans) {
+  let v = 1n;
+  for (const [field, bits] of [[KINDS.indexOf(kind), 2], [a, 7], [b, 7]]) v = (v << BigInt(bits)) | BigInt(field);
+  for (const q of [...koans].sort((x, y) => x - y)) v = (v << 13n) | BigInt(q);
+  const x = mix((v << 8n) | BigInt(crc32(bytes9(v)) & 0xFF));
+  let chars = "";
+  for (let i = 15; i >= 0; i--) chars += ALPHABET[Number((x >> BigInt(5 * i)) & 31n)];
+  return "D-" + [0, 4, 8, 12].map((i) => chars.slice(i, i + 4)).join("-");
+}
+function normalize(text) {
+  let s = text.trim().toUpperCase().replace(/-/g, "").replace(/O/g, "0").replace(/[IL]/g, "1");
+  if (s.length === 17 && s[0] === "D") s = s.slice(1);
+  if (s.length !== 16 || [...s].some((c) => !ALPHABET.includes(c))) return null;
+  return "D-" + [0, 4, 8, 12].map((i) => s.slice(i, i + 4)).join("-");
+}
+function decode(label) {
+  if (!DEAL_LABEL.test(label)) return null;
+  let x = 0n;
+  for (const c of label.slice(2).replace(/-/g, "")) x = (x << 5n) | BigInt(ALPHABET.indexOf(c));
+  x = unmix(x);
+  let v = x >> 8n;
+  const check = Number(x & 0xFFn);
+  if ((crc32(bytes9(v)) & 0xFF) !== check) return null;
+  const koans = [3, 2, 1, 0].map((i) => Number((v >> BigInt(13 * i)) & 0x1FFFn));
+  v >>= 52n;
+  const b = Number(v & 127n), a = Number((v >> 7n) & 127n), kind = Number((v >> 14n) & 3n), version = v >> 16n;
+  const lits = getLists()[3];
+  if (version !== 1n || kind > 2 || a >= lits.length || b >= lits.length) return null;
+  if (koans.some((q) => q >= N) || new Set(koans).size !== 4 || koans.some((q, i) => i && q < koans[i - 1])) return null;
+  let text, mask;
+  if (KINDS[kind] === "single") {
+    if (a !== b) return null;
+    text = lits[a].text; mask = lits[a].mask;
+  } else {
+    if (a >= b) return null;
+    const op = KINDS[kind];
+    mask = op === "and" ? mand(lits[a].mask, lits[b].mask) : mor(lits[a].mask, lits[b].mask);
+    if (!openOk(mask)) return null;
+    text = lits[a].text + " " + op + " " + lits[b].text;
+  }
+  const yes = koans.filter((q) => bit(mask, q)), no = koans.filter((q) => !bit(mask, q));
+  if (yes.length !== 2) return null;
+  return [text, mask, yes, no];
+}
+
+// ------------------------------------------------------------------ the apprentice (round 7)
+let SPACE = null;
+function space() {
+  if (SPACE) return SPACE;
+  const lits = getLists()[3];
+  const pairsBy = {and: [], or: []};
+  for (let i = 0; i < lits.length; i++) for (let j = i + 1; j < lits.length; j++) {
+    const ma = mand(lits[i].mask, lits[j].mask), mo = mor(lits[i].mask, lits[j].mask);
+    if (openOk(ma)) pairsBy.and.push([ma, i, j]);
+    if (openOk(mo)) pairsBy.or.push([mo, i, j]);
+  }
+  const nS = lits.length, nA = pairsBy.and.length, nO = pairsBy.or.length;
+  const unit = {single: nA * nO, and: 2 * nS * nO, or: nS * nA};
+  const found = new Map(), rules = [], wordings = new Map();
+  const add = (m, kind, i, j, text) => {
+    const key = maskKey(m), k = found.get(key);
+    if (!wordings.has(key)) wordings.set(key, []);
+    wordings.get(key).push(text);
+    if (k === undefined) { found.set(key, rules.length); rules.push({mask: m, weight: unit[kind], text, kind, a: i, b: j}); }
+    else rules[k].weight += unit[kind];
+  };
+  lits.forEach((e, i) => add(e.mask, "single", i, i, e.text));
+  for (const op of ["and", "or"]) for (const [m, i, j] of pairsBy[op]) add(m, op, i, j, lits[i].text + " " + op + " " + lits[j].text);
+  const R = rules.length, nw = bsWords(R);
+  const cols = Array.from({length: POOL}, () => new Uint32Array(nw));
+  const groupMap = new Map();
+  rules.forEach((r, h) => {
+    if (!groupMap.has(r.weight)) groupMap.set(r.weight, new Uint32Array(nw));
+    groupMap.get(r.weight)[h >>> 5] |= 1 << (h & 31);
+    for (let q = 0; q < POOL; q++) if (bit(r.mask, q)) cols[q][h >>> 5] |= 1 << (h & 31);
+  });
+  const groups = [...groupMap.entries()].sort((x, y) => y[0] - x[0]);
+  SPACE = {rules, index: found, wordings, counts: [nS, nA, nO], cols, groups, nw};
+  return SPACE;
+}
+function nearby(rule, n = 3) {     // fair rules joined like rule that share one of its halves
+  const [op, lits] = rule;
+  if ((op !== "and" && op !== "or") || lits.length !== 2) return [];
+  const texts = getLists()[3].map((e) => e.text);
+  const halves = new Set(lits.map(literalText).filter((t) => texts.includes(t)).map((t) => texts.indexOf(t)));
+  return space().rules.filter((r) => r.kind === op && (halves.has(r.a) || halves.has(r.b))).slice(0, n).map((r) => r.text);
+}
+function drawAnswer(d) {           // render.draw_answer, without the glue bytes
+  if (d[0] === "single") return "yes: tier 5 could draw it (it is \"" + d[1] + "\" of the tier 3 list)";
+  if (d[0] === "and" || d[0] === "or") {
+    const [kind, a, b, w, dist, near] = d;
+    return "yes: tier 5 could draw a rule with these answers (as \"" + a + " " + kind + " " + b + "\"): YES weight " +
+      w + " of 1024, at least " + dist + " from every one-part rule (nearest \"" + near + "\")";
+  }
+  return "no: tier 5 never draws it: " + drawableWhy(d[1]);
+}
+// the dealer's chair (cli.cmd_deal without the records): a verdict, a start, the hunt, the code
+function deal(text, koans) {
+  const rule = parseRule(text), mask = ruleMask(rule), drawable = openDrawable(mask);
+  if (drawable[0] === "no") return {fair: false, rule, drawable, nearby: nearby(rule)};
+  const sp = space(), key = maskKey(mask), r = sp.rules[sp.index.get(key)];
+  let yes, no, trap = null;
+  if (!koans) ({yes, no, trap} = starters(OPEN_TIER, "deal " + r.text, mask));
+  else {
+    yes = koans.filter((q) => bit(mask, q)).sort((x, y) => x - y);
+    no = koans.filter((q) => !bit(mask, q)).sort((x, y) => x - y);
+    if (yes.length !== 2) return {fair: true, unbalanced: true, rule, mask, koans};
+  }
+  const h = hunt(mask, yes, no);
+  return {fair: true, rule, drawable, yes, no, trap, hunt: h, nRules: sp.rules.length,
+    wordings: sp.wordings.get(key), code: encode(r.kind, r.a, r.b, yes.concat(no))};
+}
+function spCol(sp, q) {
+  if (q < POOL) return sp.cols[q];
+  const v = new Uint32Array(sp.nw);
+  sp.rules.forEach((r, h) => { if (bit(r.mask, q)) v[h >>> 5] |= 1 << (h & 31); });
+  return v;
+}
+function spWeight(sp, v, c) {        // weight of v (and c, when given)
+  let s = 0;
+  for (const [w, g] of sp.groups) {
+    let n = 0;
+    for (let i = 0; i < v.length; i++) n += popcnt(c ? v[i] & g[i] & c[i] : v[i] & g[i]);
+    s += w * n;
+  }
+  return s;
+}
+function spLikeliest(sp, v) {
+  for (const [w, g] of sp.groups) {
+    for (let i = 0; i < v.length; i++) { const x = v[i] & g[i]; if (x) return [i * 32 + (31 - Math.clz32(x & -x)), w]; }
+  }
+  throw new InternalError("no rule is left");
+}
+function split(sp, alive, board) {
+  const total = spWeight(sp, alive);
+  let best = 0, bestQ = null;
+  for (let q = 0; q < POOL; q++) {
+    if (board.has(q)) continue;
+    const y = spWeight(sp, alive, sp.cols[q]), s = Math.min(y, total - y);
+    if (s > best) { best = s; bestQ = q; }
+  }
+  if (bestQ === null) {
+    for (let q = POOL; q < N; q++) {
+      if (board.has(q)) continue;
+      const y = spWeight(sp, alive, spCol(sp, q));
+      if (y > 0 && y < total) return q;
+    }
+    throw new InternalError("the apprentice cannot split the rules left");
+  }
+  return bestQ;
+}
+function hunt(secret, yes, no) {
+  const sp = space();
+  if (!sp.index.has(maskKey(secret))) throw new InternalError("the apprentice does not know this rule");
+  const R = sp.rules.length, alive = new Uint32Array(sp.nw);
+  for (let h = 0; h < R; h++) alive[h >>> 5] |= 1 << (h & 31);
+  const board = new Set([...yes, ...no]);
+  const apply = (q, a) => { const c = spCol(sp, q); for (let i = 0; i < alive.length; i++) alive[i] = a ? alive[i] & c[i] : alive[i] & ~c[i]; };
+  for (const q of yes) apply(q, 1);
+  for (const q of no) apply(q, 0);
+  const steps = [];
+  let tests = 0, wrong = 0;
+  const fit = bsPop(alive);
+  for (;;) {
+    const [h, w] = spLikeliest(sp, alive);
+    const total = spWeight(sp, alive);
+    const share = Math.floor((100 * w) / total);
+    const guess = bsPop(alive) === 1 || (wrong < 10 && 2 * w >= total);
+    let q;
+    if (guess) {
+      const rule = sp.rules[h];
+      if (meq(rule.mask, secret)) { steps.push(["guess", rule.text, null, null, 1, share]); return {steps, tests, wrong, score: tests + 3 * wrong, fit}; }
+      wrong++;
+      q = firstDiff(rule.mask, secret);
+    } else {
+      if (tests === 40) throw new InternalError("the apprentice ran out of tests");
+      q = split(sp, alive, board);
+      tests++;
+    }
+    const a = bit(secret, q);
+    apply(q, a);
+    board.add(q);
+    steps.push([guess ? "guess" : "test", guess ? sp.rules[h].text : null, q, a, bsPop(alive), guess ? share : null]);
+  }
+}
+
+root.KOAN = {UsageError, InternalError, U, N, POOL, koanIndex, koanText, bit, w4, firstDiff, maskKey, meq,
+  atomText, atomGloss, DRAWABLE, KNOWN, lex, parseRule, ruleText, ruleGloss, ruleMask, unordered, sha256,
+  stream, crc32, OPEN_TIER, PAR, FLOOR, getLists, makePuzzle, labelTier, openDrawable, drawableWhy, openProblem,
+  fits, solve, crux, escapeKoan, encode, normalize, decode, space, hunt, NULLARY, GLOSS, NOT_GLOSS,
+  starters, nearby, drawAnswer, deal};
+})(typeof module !== "undefined" ? module.exports : (typeof window !== "undefined" ? window : globalThis));
+</script>
+<script>
+/* KOAN_LINKS (round 13): puzzle links such as #seed=3-48213, #code=D-WRBD-QM0B-BA50-A67D and
+   #daily=2026-11-14 (also ?seed=... and a bare #3-48213). Pure functions with no page access,
+   so tests/test_page.py can run them in node. Anything that is not a valid puzzle gives null. */
+(function (root) {
+"use strict";
+const KEYS = ["seed", "code", "daily"];
+function realDate(s) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  if (!m) return false;
+  const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]));
+  return d.getUTCFullYear() === +m[1] && d.getUTCMonth() === +m[2] - 1 && d.getUTCDate() === +m[3];
+}
+// One seed, daily or deal code as a person or an agent may write it: "3-48213", "seed 3-48213",
+// "daily-2026-11-14", "d-wrbd-qmob-ba50-a67d", a whole share line, or a whole link.
+function labelFromText(K, raw, kind) {
+  let s = String(raw == null ? "" : raw).trim();
+  if (!s || s.length > 300) return null;
+  const shared = /new\s+(seed|code|daily)\s+(\S+)/i.exec(s);
+  const named = /^(?:new\s+)?(seed|code|daily)(?:\s*[=:]\s*|\s+)(\S+)$/i.exec(s);
+  if (shared) { kind = shared[1]; s = shared[2]; }
+  else if (named) { kind = named[1]; s = named[2]; }
+  else { const at = s.search(/[#?]/); if (at >= 0) return labelFromQuery(K, s.slice(at)); }
+  kind = String(kind || "").toLowerCase();
+  let label = null;
+  const day = /^(?:daily-)?(\d{4}-\d{2}-\d{2})$/i.exec(s);
+  if (day && (kind === "daily" || /^daily-/i.test(s))) label = realDate(day[1]) ? "daily-" + day[1] : null;
+  else if (/^[1-5]-\d{5}$/.test(s)) label = kind === "" || kind === "seed" ? s : null;
+  else if ((kind === "code" || (kind === "" && /^d/i.test(s))) && !/^daily/i.test(s)) label = K.normalize(s);
+  if (!label) return null;
+  try { return K.labelTier(label) === null ? null : label; } catch (e) { return null; }
+}
+// The part of an address after # or ?: "seed=3-48213", "code=...", "daily=...", or a bare label.
+function labelFromQuery(K, q) {
+  q = String(q || "").replace(/^[#?]+/, "");
+  if (!q || q.length > 300) return null;
+  for (const part of q.split(/[&;]/)) {
+    let v;
+    try { v = decodeURIComponent(part.replace(/\+/g, " ")); } catch (e) { continue; }
+    const m = /^\s*(seed|code|daily)\s*=\s*(.*)$/i.exec(v);
+    if (m && /[#?]/.test(m[2])) continue;
+    const label = m ? labelFromText(K, m[2], m[1]) : /[#?=]/.test(v) ? null : labelFromText(K, v, "");
+    if (label) return label;
+  }
+  return null;
+}
+// The hash first (it works on any host and from a file), then the query string.
+function labelFromLink(K, hash, search) { return labelFromQuery(K, hash) || labelFromQuery(K, search); }
+function linkField(label) {
+  if (label.startsWith("daily-")) return "daily=" + label.slice(6);
+  if (label.startsWith("D-")) return "code=" + label;
+  return "seed=" + label;
+}
+// The daily follows the GMT date, so everyone has the same puzzle at the same moment.
+function todayLabel(now) {
+  const d = now || new Date();
+  return "daily-" + d.getUTCFullYear() + "-" + String(d.getUTCMonth() + 1).padStart(2, "0") + "-" + String(d.getUTCDate()).padStart(2, "0");
+}
+// Today's three puzzles, [easy, medium, hard], for a GMT date: the same rule as play by link
+// (host/koantext.py todays_seeds), so a person on the page and an agent on a link get the same
+// puzzles on the same day. easy and medium are seeds 1-NNNNN and 2-NNNNN from SHA-256; hard is
+// the tier 3 daily. tests/test_page.py checks the two rules agree.
+function todaySeeds(K, now) {
+  const hard = todayLabel(now), date = hard.slice(6);
+  const pick = (tier, name) => tier + "-" + String(BigInt("0x" + K.sha256(["KOAN", "host", date, name].join("|")).slice(0, 16)) % 100000n).padStart(5, "0");
+  return [pick(1, "easy"), pick(2, "medium"), hard];
+}
+// A full link to a puzzle, or null when the page is not served over http(s) or runs in a frame.
+function pageLink(loc, label, framed) {
+  if (framed || !loc || !/^https?:$/.test(loc.protocol || "")) return null;
+  return loc.origin + loc.pathname + "#" + linkField(label);
+}
+// What history.replaceState writes: the same page, its other query fields kept, the puzzle in the hash.
+function addressFor(loc, label) {
+  const keep = String(loc.search || "").replace(/^\?/, "").split("&").filter((p) => {
+    if (!p) return false;
+    const key = p.split("=")[0].toLowerCase();
+    return !KEYS.includes(key) && !/^\d-\d{5}$|^d-|^daily-/i.test(key);
+  });
+  return loc.pathname + (keep.length ? "?" + keep.join("&") : "") + "#" + linkField(label);
+}
+root.KOAN_LINKS = {labelFromText, labelFromQuery, labelFromLink, linkField, todayLabel, todaySeeds, pageLink, addressFor, realDate};
+})(typeof module !== "undefined" ? module.exports : (typeof window !== "undefined" ? window : globalThis));
+</script>
+<script>
+(function () {
+"use strict";
+const K = window.KOAN;
+const L = window.KOAN_LINKS;
+const $ = (id) => document.getElementById(id);
+let framed = false;
+try { framed = window.top !== window.self; } catch (e) { framed = true; }
+const STORE = "koan-web-1";
+const YESNO = ["NO", "YES"];
+let S = {game: null, history: [], tier: 1, best: 1, introHidden: false};
+let G = null;           // the derived game
+let draft = [];
+let fresh = new Set();
+
+// ------------------------------------------------------------ storage (this browser only)
+function load() {
+  try { const raw = localStorage.getItem(STORE); if (raw) S = Object.assign(S, JSON.parse(raw)); } catch (e) { /* storage off */ }
+}
+let saveFailed = false;
+function save() {
+  try { localStorage.setItem(STORE, JSON.stringify(S)); } catch (e) {     // storage off
+    if (!saveFailed) { saveFailed = true; const n = $("storeNote"); if (n) n.hidden = false; }
+  }
+}
+
+// ------------------------------------------------------------ the game, replayed from its moves
+function derive() {
+  const p = K.makePuzzle(S.game.label);
+  const g = {p, board: new Map(), tests: 0, wrong: 0, status: "playing", solvedBy: null, events: []};
+  for (const q of p.yes) g.board.set(q, {a: 1, src: "start"});
+  for (const q of p.no) g.board.set(q, {a: 0, src: "start"});
+  for (const m of S.game.moves) {
+    if (m.t === "test") {
+      if (!g.board.has(m.q)) { g.tests++; g.board.set(m.q, {a: K.bit(p.secret.mask, m.q), src: "test"}); }
+      g.events.push(["test", m.q, K.bit(p.secret.mask, m.q)]);
+    } else if (m.t === "wrong") {
+      g.wrong++;
+      const q = K.firstDiff(K.ruleMask(K.parseRule(m.g)), p.secret.mask);
+      g.board.set(q, {a: K.bit(p.secret.mask, q), src: "counter"});
+      g.events.push(["wrong", m.g, q, K.bit(p.secret.mask, q)]);
+    } else if (m.t === "solve") { g.status = "solved"; g.solvedBy = m.g; g.events.push(["solve", m.g]); }
+    else if (m.t === "giveup") { g.status = "gaveup"; g.events.push(["giveup"]); }
+  }
+  g.score = g.tests + 3 * g.wrong;
+  G = g;
+}
+function seedField(label) {
+  if (label.startsWith("daily-")) return "daily " + label.slice(6);
+  if (label.startsWith("D-")) return "code " + label;
+  return "seed " + label;
+}
+function randomLabel(tier) {
+  let n = Math.floor(Math.random() * 100000);
+  try { const a = new Uint32Array(1); crypto.getRandomValues(a); n = a[0] % 100000; } catch (e) { /* Math.random */ }
+  return tier + "-" + String(n).padStart(5, "0");
+}
+function todayLabel() { return L.todayLabel(new Date()); }      // the GMT date (round 13)
+function todaySeeds() { return L.todaySeeds(K, new Date()); }   // [easy, medium, hard], as play by link
+function startGame(label) {
+  if (G && G.status === "playing" && (S.game.moves.length)) {
+    S.history.push({label: S.game.label, tier: G.p.tier, outcome: "abandoned", ended: new Date().toISOString().slice(0, 10)});
+  }
+  S.game = {label, moves: []};
+  S.tier = K.labelTier(label);
+  draft = []; fresh = new Set();
+  derive(); save();
+  $("ruleReply").textContent = ""; $("testReply").textContent = ""; $("ruleInput").value = "";
+  $("newPanel").hidden = true;
+  hideLinkAsk();
+  setAddress();
+  render();
+}
+
+// ------------------------------------------------------------ puzzle links (round 13)
+let pendingLink = null;
+// The address bar always holds a link to the puzzle in play, so a reload resumes it.
+function setAddress() {
+  try {
+    const want = L.addressFor(location, S.game.label);
+    if (location.pathname + location.search + location.hash !== want) history.replaceState(null, "", want);
+  } catch (e) { /* a frame or a file address may refuse: the game still plays */ }
+}
+function shareLink(label) { try { return L.pageLink(location, label, framed); } catch (e) { return null; } }
+function hideLinkAsk() { pendingLink = null; $("linkPanel").hidden = true; }
+// Open the puzzle the address names. A game with moves is never dropped without asking.
+function followLink() {
+  let label = null;
+  try { label = L.labelFromLink(K, location.hash, location.search); } catch (e) { label = null; }
+  if (!label || (S.game && label === S.game.label)) { hideLinkAsk(); setAddress(); return; }   // junk is ignored
+  if (G && G.status === "playing" && S.game.moves.length) {
+    pendingLink = label;
+    const n = S.game.moves.length;
+    $("linkText").textContent = "This link opens " + seedField(label) + " (tier " + K.labelTier(label) + "). Your game, " +
+      seedField(S.game.label) + ", has " + n + " move" + (n === 1 ? "" : "s") + " and is not finished. Opening the link ends it, unscored.";
+    $("linkPanel").hidden = false;
+    $("linkPanel").scrollIntoView({block: "nearest"});
+    return;
+  }
+  startGame(label);
+}
+
+// ------------------------------------------------------------ drawing koans
+// Round 13: the bars and their digits are drawn by CSS (data-d), hidden from screen readers, and
+// one hidden text line ("1 1") carries the koan, so page text reads each koan as one unit.
+function tiles(t, extra) {
+  const el = document.createElement("span");
+  el.className = "tiles";
+  const sr = document.createElement("span");
+  sr.className = "sr"; sr.textContent = t.join(" ") + (extra || "");
+  el.appendChild(sr);
+  for (const d of t) {
+    const c = document.createElement("span");
+    c.className = "t"; c.dataset.d = d; c.setAttribute("aria-hidden", "true");
+    c.innerHTML = '<i style="height:' + (d * 6) + 'px"></i>';
+    el.appendChild(c);
+  }
+  return el;
+}
+function koanRow(q, info) {
+  const row = document.createElement("div");
+  row.className = "k" + (fresh.has(q) ? " fresh" : "");
+  row.setAttribute("role", "listitem");
+  const src = info.src === "test" ? "" : info.src === "start" ? "start" : "counter";
+  row.appendChild(tiles(K.U[q], src ? " (" + src + ")" : ""));
+  if (src) {
+    const tag = document.createElement("span");
+    tag.className = "tag"; tag.dataset.tag = src; tag.setAttribute("aria-hidden", "true");
+    row.appendChild(tag);
+  }
+  return row;
+}
+const kt = (q) => K.U[q].join(" ");
+
+// ------------------------------------------------------------ rendering
+function render() {
+  const p = G.p, par = K.PAR[p.tier];
+  disarmGiveup();
+  if (!$("dealPanel").hidden) { if (dealClosed()) showDealClosed(); else clearDealClosed(); }   // round 12
+  const meta = $("meta");
+  const where = p.label.startsWith("D-") ? "dealt" : p.label.startsWith("daily-") ? "daily" : "seed";
+  meta.innerHTML = "";
+  for (const [lab, val] of [["tier", p.tier], [where, p.label.replace(/^daily-/, "")], ["score", G.score], ["par", par], ["tests", G.tests], ["wrong", G.wrong]]) {
+    const s = document.createElement("div"); s.className = "stat";
+    s.innerHTML = '<span class="label"></span><b></b>';
+    s.firstChild.textContent = lab; s.lastChild.textContent = val;
+    if (lab === "seed" || lab === "dealt" || lab === "daily") s.lastChild.style.fontSize = "15px";
+    meta.appendChild(s);
+  }
+  // the board: start koans first, then in the order they joined
+  const yes = $("yesList"), no = $("noList");
+  yes.innerHTML = ""; no.innerHTML = "";
+  let ny = 0, nn = 0;
+  for (const [q, info] of G.board) {
+    (info.a ? yes : no).appendChild(koanRow(q, info));
+    if (info.a) ny++; else nn++;
+  }
+  $("yesN").textContent = ny + (ny === 1 ? " koan" : " koans"); $("noN").textContent = nn + (nn === 1 ? " koan" : " koans");
+  $("boardCount").textContent = G.board.size + " koans";
+  const side = (a) => [...G.board].filter(([, info]) => info.a === a).map(([q]) => kt(q)).join(" / ") || "none";
+  $("boardText").textContent = "Board. YES: " + side(1) + ". NO: " + side(0) + ".";
+  renderDraft();
+  const over = G.status !== "playing";
+  for (const id of ["testBtn", "guessBtn", "back", "giveupBtn"]) $(id).disabled = over;
+  document.querySelectorAll(".key").forEach((b) => (b.disabled = over));
+  $("padPanel").hidden = over;
+  renderLog();
+  renderCard();
+  renderRecords();
+  $("intro").hidden = !!S.introHidden;
+}
+function renderDraft() {
+  const el = $("draft");
+  el.innerHTML = "";
+  if (!draft.length) {
+    const h = document.createElement("span"); h.className = "hint";
+    h.textContent = "Tap 1 to 4 (or type them) to build a koan of 1 to 6 digits.";
+    el.appendChild(h); return;
+  }
+  el.appendChild(tiles(draft));
+  const q = K.koanIndex(draft);
+  const info = G.board.get(q);
+  const h = document.createElement("span"); h.className = "hint";
+  h.textContent = info ? "already on the board: " + YESNO[info.a] + ", free" : "";
+  el.appendChild(h);
+}
+function renderLog() {
+  const log = $("log");
+  log.innerHTML = "";
+  const add = (n, html) => { const d = document.createElement("div"); d.innerHTML = '<span class="n">' + n + "</span> <span></span>"; d.lastChild.innerHTML = html; log.appendChild(d); };
+  add("", "start: " + G.p.yes.map(kt).join(" / ") + " are YES, " + G.p.no.map(kt).join(" / ") + " are NO");
+  let n = 0;
+  for (const e of G.events) {
+    if (e[0] === "test") add(++n, "test <b class='mono'>" + kt(e[1]) + "</b>: <span class='answer " + (e[2] ? "yes" : "no") + "'>" + YESNO[e[2]] + "</span>");
+    else if (e[0] === "wrong") add(++n, "guess <span class='mono'>" + esc(e[1]) + "</span>: wrong, +3. <b class='mono'>" + kt(e[2]) + "</b> is " + YESNO[e[3]]);
+    else if (e[0] === "solve") add(++n, "guess <span class='mono'>" + esc(e[1]) + "</span>: right");
+    else add("", "gave up");
+  }
+  log.scrollTop = log.scrollHeight;
+}
+function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"})[c]); }
+
+// ------------------------------------------------------------ testing
+function addDigit(d) {
+  if (G.status !== "playing" || draft.length >= 6) return;
+  draft.push(d); renderDraft();
+}
+function test() {
+  if (G.status !== "playing") return;
+  const reply = $("testReply");
+  if (!draft.length) { reply.textContent = "Build a koan first: tap 1 to 4."; return; }
+  const q = K.koanIndex(draft);
+  if (G.board.has(q)) { reply.innerHTML = "<b class='mono'>" + kt(q) + "</b> is already on the board: " + YESNO[G.board.get(q).a] + ". Free."; draft = []; renderDraft(); return; }
+  if (G.tests >= 40) { reply.textContent = "That is the 40-test limit of a puzzle. Guess, or give up."; return; }
+  S.game.moves.push({t: "test", q});
+  derive(); save();
+  const a = G.board.get(q).a;
+  fresh = new Set([q]);
+  reply.innerHTML = "<b class='mono'>" + kt(q) + "</b> is <span class='answer " + (a ? "yes" : "no") + "'>" + YESNO[a] + "</span>";
+  draft = [];
+  render();
+}
+
+// ------------------------------------------------------------ check and guess
+function parse(text) {
+  try { return {rule: K.parseRule(text)}; } catch (e) {
+    if (e instanceof K.UsageError) return {error: e};
+    throw e;
+  }
+}
+function line(label, html, cls) {
+  const d = document.createElement("div"); d.className = "line";
+  d.innerHTML = '<span class="label"></span><div></div>';
+  d.firstChild.textContent = label; d.lastChild.innerHTML = html;
+  if (cls) d.lastChild.className = cls;
+  return d;
+}
+function showError(e) {
+  const r = $("ruleReply"); r.innerHTML = "";
+  r.appendChild(line("problem", esc(e.message), "verdict bad"));
+  const tries = (e.tries || []).filter(([c]) => c.startsWith("check "));
+  if (tries.length) {
+    const box = document.createElement("div"); box.className = "tries";
+    for (const [c, note] of tries) {
+      const b = document.createElement("button"); b.type = "button"; b.className = "chip";
+      const rule = c.slice(6);
+      b.textContent = rule + (note ? "  (" + note + ")" : "");
+      b.addEventListener("click", () => { $("ruleInput").value = rule; $("ruleInput").focus(); });
+      box.appendChild(b);
+    }
+    r.appendChild(line("try", "")).lastChild.appendChild(box);
+  }
+}
+function conflicts(mask) {
+  const out = [];
+  for (const [q, info] of G.board) if (K.bit(mask, q) !== info.a) out.push(q);
+  return out;
+}
+function conflictText(cs, mask) {
+  return cs.slice(0, 6).map((q) => "<b class='mono'>" + kt(q) + "</b> is " + YESNO[G.board.get(q).a] + ", your rule says " + YESNO[K.bit(mask, q)]).join("<br>") +
+    (cs.length > 6 ? "<br>and " + (cs.length - 6) + " more" : "");
+}
+function check() {
+  const text = $("ruleInput").value.trim();
+  const r = $("ruleReply");
+  const parts = text.split(/\s+vs\s+/i).filter((x) => x);
+  if (parts.length > 1) {
+    if (parts.length > 6) { showError(new K.UsageError("compare at most 6 rules at a time")); return; }
+    r.innerHTML = "";
+    const wrap = document.createElement("div"); wrap.className = "tablewrap";
+    const table = document.createElement("table"); table.className = "vs";
+    for (const part of parts) {
+      const res = parse(part);
+      const tr = document.createElement("tr");
+      if (res.error) { tr.innerHTML = "<td>" + esc(part) + "</td><td class='verdict bad'>" + esc(res.error.message) + "</td>"; }
+      else {
+        const m = K.ruleMask(res.rule), cs = conflicts(m);
+        tr.innerHTML = "<td>" + esc(K.ruleText(res.rule)) + "</td><td><span class='verdict " + (cs.length ? "bad'>disagrees with " + cs.length : "ok'>fits the board") + "</span><br><span style='color:var(--muted)'>" + esc(K.ruleGloss(res.rule)) + "</span></td>";
+      }
+      table.appendChild(tr);
+    }
+    wrap.appendChild(table); r.appendChild(wrap); return;
+  }
+  const res = parse(text);
+  if (res.error) { showError(res.error); return; }
+  const m = K.ruleMask(res.rule), cs = conflicts(m);
+  r.innerHTML = "";
+  r.appendChild(line("parsed", "<span class='mono'>" + esc(K.ruleText(res.rule)) + "</span>"));
+  r.appendChild(line("means", esc(K.ruleGloss(res.rule))));
+  if (!cs.length) r.appendChild(line("check", "fits all " + G.board.size + " koans on the board. Free.", "verdict ok"));
+  else {
+    r.appendChild(line("check", "disagrees with " + cs.length + " koan" + (cs.length > 1 ? "s" : "") + " on the board. Free.", "verdict bad"));
+    r.appendChild(line("", conflictText(cs, m)));
+  }
+}
+function guess() {
+  if (G.status !== "playing") return;
+  const text = $("ruleInput").value.trim();
+  if (/\s+vs\s+/i.test(text)) { showError(new K.UsageError("guess takes one rule. Use check to compare rules with vs.")); return; }
+  const res = parse(text);
+  if (res.error) { showError(res.error); return; }
+  const rule = res.rule, m = K.ruleMask(rule), cs = conflicts(m);
+  const r = $("ruleReply"); r.innerHTML = "";
+  r.appendChild(line("parsed", "<span class='mono'>" + esc(K.ruleText(rule)) + "</span>"));
+  r.appendChild(line("means", esc(K.ruleGloss(rule))));
+  if (cs.length) {
+    r.appendChild(line("bounced", "your rule disagrees with " + cs.length + " koan" + (cs.length > 1 ? "s" : "") + " on the board, so it cannot be the hidden rule. Free, nothing recorded.", "verdict bad"));
+    r.appendChild(line("", conflictText(cs, m)));
+    return;
+  }
+  if (K.meq(m, G.p.secret.mask)) {
+    S.game.moves.push({t: "solve", g: K.ruleText(rule)});
+    derive(); finish("solved"); return;
+  }
+  const size = G.board.size;
+  if (G.wrong >= 10) {
+    r.appendChild(line("wrong", "fits all " + size + " koans on the board but is not the hidden rule. After 10 wrong guesses there is no cost and no counterexample.", "verdict bad"));
+    return;
+  }
+  S.game.moves.push({t: "wrong", g: K.ruleText(rule)});
+  derive(); save();
+  const q = K.firstDiff(m, G.p.secret.mask);
+  fresh = new Set([q]);
+  r.appendChild(line("wrong", "fits all " + size + " koans on the board but is not the hidden rule. Cost 3. The first 10 wrong guesses cost 3 each; after them a wrong guess is free. Paid ones left: " + Math.max(0, 10 - G.wrong) + ".", "verdict bad"));
+  r.appendChild(line("counter", "<b class='mono'>" + kt(q) + "</b> is " + YESNO[K.bit(G.p.secret.mask, q)] + ", your rule says " + YESNO[K.bit(m, q)] + ". It is now on the board."));
+  const tier = G.p.tier;
+  if (tier < K.OPEN_TIER) {
+    if (!K.getLists()[tier].some((e) => K.meq(e.mask, m)))
+      r.appendChild(line("tier " + tier, "This rule can never be the hidden rule at tier " + tier + ": it is not on the tier " + tier + " list (see Reference). This is information, not a hint about the hidden rule.", "note"));
+  } else {
+    const d = K.openDrawable(m);
+    if (d[0] === "no") r.appendChild(line("tier 5", "This rule can never be the hidden rule at tier 5: " + esc(K.drawableWhy(d[1])), "note"));
+  }
+  render();
+}
+// Round 13: Give up stays armed until the player answers or makes another move (no timer: an
+// agent may take half a minute between clicks). A second tap, or "Yes, give up", confirms.
+function giveup(confirmed) {
+  if (G.status !== "playing") return;
+  const b = $("giveupBtn");
+  if (!confirmed) {
+    b.textContent = "Really give up? Tap again";
+    b.dataset.armed = "1";
+    $("giveupAsk").textContent = "Give up? The rule is shown and the game is not scored.";
+    $("giveupYes").hidden = false; $("giveupNo").hidden = false;
+    return;
+  }
+  disarmGiveup();
+  S.game.moves.push({t: "giveup"});
+  derive(); finish("gaveup");
+}
+function disarmGiveup() {
+  const b = $("giveupBtn");
+  if (!b.dataset.armed && $("giveupYes").hidden) return;
+  delete b.dataset.armed; b.textContent = "Give up";
+  $("giveupAsk").textContent = "";
+  $("giveupYes").hidden = true; $("giveupNo").hidden = true;
+}
+function finish(outcome) {
+  const p = G.p, par = K.PAR[p.tier];
+  const rec = {label: p.label, tier: p.tier, outcome, ended: new Date().toISOString().slice(0, 10)};
+  if (outcome === "solved") { rec.score = G.score; rec.par = par; }
+  const before = S.history.filter((h) => h.label === p.label && h.outcome === "solved");
+  G.prior = {plays: S.history.filter((h) => h.label === p.label).length, best: before.length ? Math.min(...before.map((h) => h.score)) : null};
+  S.history.push(rec);
+  if (S.history.length > 200) S.history = S.history.slice(-200);
+  if (outcome === "solved" && G.score <= par && p.tier < 5 && !p.label.startsWith("D-")) S.best = Math.max(S.best || 1, p.tier + 1);
+  save();
+  $("ruleReply").innerHTML = "";
+  render();
+  $("card").scrollIntoView({behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start"});
+  try { $("card").focus({preventScroll: true}); } catch (e) { /* old browser */ }
+}
+
+// ------------------------------------------------------------ the end card
+function renderCard() {
+  const card = $("card");
+  if (G.status === "playing") { card.hidden = true; card.innerHTML = ""; return; }
+  if (!G.card) {
+    const p = G.p;
+    G.card = {solver: K.solve(p), crux: K.crux(p), escape: K.escapeKoan(p), hunt: p.tier === K.OPEN_TIER ? K.hunt(p.secret.mask, p.yes, p.no) : null};
+  }
+  const p = G.p, c = G.card, par = K.PAR[p.tier], secret = p.secret;
+  const parts = [];
+  const solved = G.status === "solved";
+  parts.push("<div class='label'>" + (solved ? "Solved" : "Given up") + " &middot; tier " + p.tier + " &middot; " + esc(seedField(p.label)) + "</div>");
+  parts.push("<h2>" + (solved ? (p.label.startsWith("D-") ? "The dealer nods." : "The master nods.") : "The puzzle is over.") + "</h2>");
+  parts.push("<div class='rule'>" + esc(secret.text) + "</div><div style='color:var(--muted)'>" + esc(K.ruleGloss(secret.rule)) + "</div>");
+  const rows = document.createElement("div"); rows.className = "reply";
+  if (solved) {
+    const g = K.parseRule(G.solvedBy);
+    let equal = "different wording, same answer on every koan";
+    if (K.ruleText(g) === secret.text) equal = "same wording";
+    else if (g[0] === secret.rule[0] && JSON.stringify(g[1].map(K.unordered).sort()) === JSON.stringify(secret.rule[1].map(K.unordered).sort())) equal = "same rule, parts in another order";
+    rows.appendChild(line("you said", "<span class='mono'>" + esc(G.solvedBy) + "</span> &middot; " + equal));
+    const d = G.score - par;
+    const rel = d === 0 ? "at par" : d < 0 ? (-d) + " under par" : d + " over par";
+    rows.appendChild(line("score", "<b>" + G.score + "</b> = " + G.tests + " test" + (G.tests === 1 ? "" : "s") + " + 3 &times; " + G.wrong + " wrong &middot; par " + par + ", " + rel));
+  } else {
+    rows.appendChild(line("score", "not scored (" + G.tests + " tests, " + G.wrong + " wrong) &middot; par " + par));
+  }
+  if (c.solver !== null) rows.appendChild(line("solver", "a program that knows the tier " + p.tier + " list needed <b>" + c.solver + "</b> test" + (c.solver === 1 ? "" : "s") + " from the same start"));
+  if (c.hunt) {
+    const h = c.hunt;
+    const box = document.createElement("div");
+    box.innerHTML = "the apprentice scored <b>" + h.score + "</b> = " + h.tests + " tests + 3 &times; " + h.wrong + " wrong. It knows all 700 rules tier 5 can draw and their chances (" + h.fit + " fit the start):";
+    const steps = document.createElement("div"); steps.className = "steps"; steps.style.marginTop = "6px";
+    for (const [kind, text, q, a] of h.steps) {
+      const s = document.createElement("span"); s.className = "step";
+      if (kind === "test") s.textContent = kt(q) + " " + YESNO[a];
+      else if (q === null) { s.className += " right"; s.textContent = "guess " + text + ": right"; }
+      else { s.className += " wrong"; s.textContent = "guess " + text + ": wrong"; }
+      steps.appendChild(s);
+    }
+    box.appendChild(steps);
+    rows.appendChild(line("apprentice", "")).lastChild.appendChild(box);
+  }
+  if (p.trap) rows.appendChild(line("trap", "the start also fit <span class='mono'>" + esc(p.trap.text) + "</span>. Koan <b class='mono'>" + kt(c.escape) + "</b> told them apart (rule " + YESNO[K.bit(secret.mask, c.escape)] + ", trap " + YESNO[K.bit(p.trap.mask, c.escape)] + ")."));
+  if (c.crux) {
+    const [q, k, n] = c.crux;
+    const ans = q === null ? "" : YESNO[K.bit(secret.mask, q)];
+    rows.appendChild(line("crux", n === 0 ? "the start fit no other rule" :
+      "koan <b class='mono'>" + kt(q) + "</b> (answer " + ans + ") would have ruled out " + (k === n ? "all " + n : k + " of the " + n) + " other rules that fit the start"));
+  }
+  if (G.prior) rows.appendChild(line("record", G.prior.plays === 0 ? "first play of this " + (p.label.startsWith("D-") ? "deal" : "seed") : "played " + G.prior.plays + " time" + (G.prior.plays > 1 ? "s" : "") + " before" + (G.prior.best !== null ? ", best " + G.prior.best : "")));
+  card.innerHTML = parts.join("");
+  card.appendChild(rows);
+  if (solved) {
+    const note = "par " + par + (c.solver !== null ? ", solver " + c.solver : c.hunt ? ", apprentice " + c.hunt.score : "");
+    const link = shareLink(p.label);      // round 13: a link when the page is served over http(s)
+    const shareText = "KOAN in " + G.score + " (" + note + "): new " + seedField(p.label) + (link ? " " + link : "");
+    const sh = document.createElement("div"); sh.className = "share"; sh.style.marginTop = "12px";
+    sh.innerHTML = "<span class='label'>Share</span><code id='shareText'></code><button class='btn' type='button' id='copyBtn'>Copy</button>";
+    sh.querySelector("code").textContent = shareText;
+    card.appendChild(sh);
+    const hint = document.createElement("div"); hint.className = "label"; hint.style.cssText = "text-transform:none;letter-spacing:0;font-weight:400;margin-top:6px";
+    hint.textContent = "It gives nothing away. A friend " + (link ? "opens the link, or " : "") + "types the seed or code into New puzzle here, or runs the same line in the terminal game.";
+    card.appendChild(hint);
+    sh.querySelector("#copyBtn").addEventListener("click", (ev) => {
+      const btn = ev.currentTarget;
+      const done = () => { btn.textContent = "Copied"; setTimeout(() => (btn.textContent = "Copy"), 1600); };
+      const fallback = () => { const range = document.createRange(); range.selectNodeContents(sh.querySelector("code")); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(range); btn.textContent = "Selected: copy it"; };
+      try { navigator.clipboard.writeText(shareText).then(done, fallback); } catch (e) { fallback(); }
+    });
+  }
+  const next = document.createElement("div"); next.className = "padbtns"; next.style.marginTop = "14px";
+  const offer = [];
+  if (solved && G.score <= par && p.tier < 5 && !p.label.startsWith("D-")) offer.push(["Next: tier " + (p.tier + 1), p.tier + 1, true]);
+  offer.push(["Another tier " + p.tier, p.tier, offer.length === 0]);
+  for (const [label, tier, primary] of offer) {
+    const b = document.createElement("button"); b.type = "button"; b.className = "btn" + (primary ? " primary" : "");
+    b.textContent = label; b.addEventListener("click", () => startGame(randomLabel(tier)));
+    next.appendChild(b);
+  }
+  const daily = document.createElement("button"); daily.type = "button"; daily.className = "btn"; daily.textContent = "Today's puzzles";
+  daily.addEventListener("click", () => $("newBtn").click());   // easy, medium and hard are in the New puzzle panel
+  next.appendChild(daily);
+  card.appendChild(next);
+  card.hidden = false;
+}
+
+// ------------------------------------------------------------ reference
+const WORDS = [      // [shown, meaning, what a tap adds to the rule]
+  ["has D", "contains a D", "has"], ["starts D", "first digit is D", "starts"], ["ends D", "last digit is D", "ends"],
+  ...K.NULLARY.map((w) => [w, K.GLOSS[w], w]),
+  ["more D than E", "more Ds than Es", "more"], ["as many D as E", "as many Ds as Es (zero of each counts)", "as many"],
+  ["count D atleast K", "number of Ds is at least K (also atmost K, exactly K, even, odd)", "count"],
+  ["length atleast K", "number of digits is at least K (also atmost, exactly, even, odd)", "length"],
+  ["kinds exactly K", "number of different digits is K (also atleast, atmost, even, odd)", "kinds"],
+  ["sum odd", "digit sum is odd (also even, atleast K, atmost K, exactly K)", "sum"],
+  ["not X", "the opposite of X", "not"],
+];
+function renderWords() {
+  const box = $("words");
+  for (const [w, m, add] of WORDS) {
+    const b = document.createElement("button"); b.type = "button"; b.textContent = w;
+    b.setAttribute("aria-label", "Add to the rule: " + w);
+    b.addEventListener("click", () => insert(add));
+    const d = document.createElement("div"); d.textContent = m;
+    box.appendChild(b); box.appendChild(d);
+  }
+}
+function renderLists() {
+  const box = $("lists");
+  const lists = K.getLists();
+  for (const tier of [1, 2, 3, 4]) {
+    const h = document.createElement("div"); h.className = "label"; h.style.marginTop = "12px";
+    h.textContent = "Tier " + tier + ": " + lists[tier].length + " rules, par " + K.PAR[tier] + (tier > 1 ? " (it includes the tier " + (tier - 1) + " list)" : "");
+    box.appendChild(h);
+    const l = document.createElement("div"); l.className = "tierlist";
+    const shown = tier === 1 ? lists[tier] : lists[tier].filter((e) => !lists[tier - 1].some((x) => x.text === e.text));
+    for (const e of shown) { const d = document.createElement("div"); d.textContent = e.text; l.appendChild(d); }
+    if (tier > 1) { const d = document.createElement("div"); d.style.color = "var(--muted)"; d.textContent = "and the tier " + (tier - 1) + " list"; l.appendChild(d); }
+    box.appendChild(l);
+  }
+}
+function renderRecords() {
+  const box = $("records");
+  const done = S.history.filter((h) => h.outcome !== "abandoned");
+  if (!done.length) { box.innerHTML = "<p>No finished puzzles yet.</p>"; return; }
+  const rows = [];
+  for (const tier of [1, 2, 3, 4, 5]) {
+    const hs = done.filter((h) => h.tier === tier && !h.label.startsWith("D-"));
+    if (!hs.length) continue;
+    const solved = hs.filter((h) => h.outcome === "solved");
+    rows.push("<p><b>Tier " + tier + "</b>: " + solved.length + " of " + hs.length + " solved" + (solved.length ? ", best " + Math.min(...solved.map((h) => h.score)) : "") + ", par " + K.PAR[tier] + "</p>");
+  }
+  const dealt = done.filter((h) => h.label.startsWith("D-"));
+  if (dealt.length) rows.push("<p>" + dealt.length + " puzzle" + (dealt.length > 1 ? "s" : "") + " played from codes.</p>");
+  box.innerHTML = rows.join("");
+}
+
+// ------------------------------------------------------------ the word chips
+const CHIP_WORDS = ["has", "starts", "ends", "not", "and", "or", "1", "2", "3", "4"];
+const MORE_WORDS = ["same ends", "palindrome", "jump", "zigzag", "grouped", "nondecreasing", "nonincreasing",
+  "strictly increasing", "strictly decreasing", "adjacent repeat", "all different", "first is max", "first is min",
+  "last is max", "last is min", "max once", "min once", "last above first", "last below first", "more", "than",
+  "as many", "as", "count", "length", "kinds", "sum", "atleast", "atmost", "exactly", "even", "odd", "5", "6", "vs"];
+function insert(word) {
+  const inp = $("ruleInput");
+  const v = inp.value;
+  inp.value = v + (v && !/\s$/.test(v) ? " " : "") + word + " ";
+  inp.focus();
+  try { inp.setSelectionRange(inp.value.length, inp.value.length); } catch (e) { /* not a text field */ }
+}
+function renderChips() {
+  const box = $("chips");
+  const make = (w) => { const b = document.createElement("button"); b.type = "button"; b.className = "chip"; b.textContent = w; b.addEventListener("click", () => insert(w)); return b; };
+  for (const w of CHIP_WORDS) box.appendChild(make(w));
+  const more = document.createElement("button"); more.type = "button"; more.className = "chip more"; more.textContent = "more words";
+  const clear = document.createElement("button"); clear.type = "button"; clear.className = "chip more"; clear.textContent = "clear";
+  clear.addEventListener("click", () => { $("ruleInput").value = ""; $("ruleInput").focus(); });
+  more.addEventListener("click", () => { more.remove(); for (const w of MORE_WORDS) box.insertBefore(make(w), clear); });
+  box.appendChild(more); box.appendChild(clear);
+}
+
+// ------------------------------------------------------------ new puzzle panel
+let pickTier = 1;
+function renderTierBtns() {
+  const box = $("tierBtns"); box.innerHTML = "";
+  for (const t of [1, 2, 3, 4, 5]) {
+    const b = document.createElement("button"); b.type = "button"; b.className = "tierbtn"; b.textContent = t;
+    b.setAttribute("aria-pressed", String(t === pickTier)); b.setAttribute("aria-label", "Tier " + t);
+    b.addEventListener("click", () => { pickTier = t; renderTierBtns(); });
+    box.appendChild(b);
+  }
+  const notes = {1: "the easiest: one condition from a list of 19", 2: "one condition from a list of 62", 3: "one condition from a list of 106", 4: "adds 40 two-part shapes: 146 rules", 5: "open: one condition or two joined, and an apprentice to beat"};
+  $("tierNote").textContent = "Tier " + pickTier + ": " + notes[pickTier] + ". Par " + K.PAR[pickTier] + ".";
+}
+function startFromInput() {
+  const raw = $("seedInput").value.trim();
+  const err = $("seedErr"); err.textContent = "";
+  if (!raw) { err.textContent = "Type a seed like 5-44352, a date like daily-2026-11-06, or a code like D-H49G-CVV3-GXSR-S3C7."; return; }
+  const label = L.labelFromText(K, raw, "");     // also a whole share line or a whole link (round 13)
+  if (label === null) { err.textContent = /^(code\s+)?d-?[0-9a-z]{4}/i.test(raw) && !/^daily/i.test(raw) ? "That code is not a deal: check it for a typo." : "That is not a seed (like 3-48213), a daily (daily-2026-11-06) or a deal code (D-XXXX-XXXX-XXXX-XXXX)."; return; }
+  startGame(label);
+}
+
+// ------------------------------------------------------------ the dealer's chair
+function parseBoard(raw) {
+  const parts = raw.split(/\s*(?:\/|,|;|\band\b)\s*/i).map((s) => s.trim()).filter((s) => s);
+  const koans = [];
+  for (const part of parts) {
+    const digits = part.replace(/\s+/g, "");
+    if (!/^[1-4]{1,6}$/.test(digits)) throw new K.UsageError("\"" + part + "\" is not a koan: 1 to 6 digits, each 1 to 4");
+    koans.push(K.koanIndex([...digits].map(Number)));
+  }
+  if (koans.length !== 4 || new Set(koans).size !== 4) throw new K.UsageError("a board has four different koans, separated by / (you gave " + new Set(koans).size + ")");
+  return koans;
+}
+function miniBoard(yes, no) {
+  const box = document.createElement("div"); box.className = "board"; box.style.marginTop = "4px";
+  for (const [cls, qs] of [["yes", yes], ["no", no]]) {
+    const side = document.createElement("div"); side.className = "side " + cls;
+    const h = document.createElement("h3"); h.textContent = cls.toUpperCase(); side.appendChild(h);
+    const list = document.createElement("div"); list.className = "klist";
+    for (const q of qs) { const r = document.createElement("div"); r.className = "k"; r.appendChild(tiles(K.U[q])); list.appendChild(r); }
+    side.appendChild(list); box.appendChild(side);
+  }
+  return box;
+}
+function renderDealRecord() {
+  const d = S.deals;
+  $("dealRecord").textContent = d && d.total ? d.total + " puzzle" + (d.total > 1 ? "s" : "") + " dealt in this browser. Best: the apprentice took " + d.best.score + " on " + d.best.code + "." : "";
+}
+// Round 12: while a tier-5 puzzle is in play the chair is closed. A deal's fair / not fair
+// verdict and its count of fitting rules would be a free drawability check for that puzzle.
+function dealClosed() { return !!(G && G.status === "playing" && G.p.tier === 5); }
+function showDealClosed() {
+  const r = $("dealReply"); r.innerHTML = ""; r.dataset.closed = "1";
+  r.appendChild(line("deal", "closed while a tier 5 puzzle is in play: a deal would say for free which rules tier 5 can draw. Solve it or give it up, then deal.", "verdict bad"));
+}
+function clearDealClosed() {
+  const r = $("dealReply");
+  if (r.dataset.closed) { r.innerHTML = ""; delete r.dataset.closed; }
+}
+function doDeal() {
+  if (dealClosed()) { showDealClosed(); return; }
+  clearDealClosed();
+  const r = $("dealReply"); r.innerHTML = "";
+  let koans = null, d;
+  try {
+    const raw = $("dealBoard").value.trim();
+    if (raw) koans = parseBoard(raw);
+    d = K.deal($("dealRule").value.trim(), koans);
+  } catch (e) {
+    if (!(e instanceof K.UsageError)) throw e;
+    r.appendChild(line("problem", esc(e.message), "verdict bad"));
+    return;
+  }
+  r.appendChild(line("parsed", "<span class='mono'>" + esc(K.ruleText(d.rule)) + "</span>"));
+  r.appendChild(line("means", esc(K.ruleGloss(d.rule))));
+  if (!d.fair) {
+    r.appendChild(line("deal", "not fair: " + esc(K.drawAnswer(d.drawable).slice(4)), "verdict bad"));
+    if (d.nearby.length) {
+      const box = document.createElement("div"); box.className = "tries";
+      for (const t of d.nearby) {
+        const b = document.createElement("button"); b.type = "button"; b.className = "chip"; b.textContent = t;
+        b.addEventListener("click", () => { $("dealRule").value = t; doDeal(); });
+        box.appendChild(b);
+      }
+      r.appendChild(line("fair ones", "")).lastChild.appendChild(box);
+    }
+    return;
+  }
+  if (d.unbalanced) {
+    r.appendChild(line("deal", "a board needs 2 koans your rule says YES to and 2 it says NO to. Your rule says: " +
+      d.koans.map((q) => "<b class='mono'>" + kt(q) + "</b> is " + YESNO[K.bit(d.mask, q)]).join(", ") + ".", "verdict bad"));
+    return;
+  }
+  r.appendChild(line("deal", "fair: " + esc(K.drawAnswer(d.drawable).slice(5)), "verdict ok"));
+  if (d.wordings.length > 1) r.appendChild(line("", "the draw words it " + d.wordings.length + " ways, so their chances add up: <span class='mono'>" + d.wordings.map(esc).join(" / ") + "</span>"));
+  r.appendChild(line("start", d.trap ? "the game's start, with the trap <span class='mono'>" + esc(d.trap.text) + "</span> (give four koans to set your own)" : "your board"));
+  r.appendChild(line("", "")).lastChild.appendChild(miniBoard(d.yes, d.no));
+  const h = d.hunt;
+  const steps = document.createElement("div"); steps.className = "steps";
+  for (const [kind, text, q, a, left, share] of h.steps) {
+    const s = document.createElement("span"); s.className = "step";
+    if (kind === "test") s.textContent = "test " + kt(q) + " " + YESNO[a] + " \u00b7 " + left + " left";
+    else if (q === null) { s.className += " right"; s.textContent = "guess " + text + " (" + share + "%): right"; }
+    else { s.className += " wrong"; s.textContent = "guess " + text + " (" + share + "%): wrong, " + kt(q) + " is " + YESNO[a]; }
+    steps.appendChild(s);
+  }
+  r.appendChild(line("hunt", h.fit + " of the " + d.nRules + " rules tier 5 can draw fit this board.")).lastChild.appendChild(steps);
+  r.appendChild(line("score", "the apprentice took <b>" + h.score + "</b> = " + h.tests + " tests + 3 &times; " + h.wrong + " wrong (tier 5 par " + K.PAR[5] + ")"));
+  const deals = S.deals || {total: 0, best: null, codes: []};
+  deals.codes = deals.codes || [];
+  const again = deals.codes.includes(d.code);
+  if (!again) { deals.total++; deals.codes.push(d.code); if (deals.codes.length > 50) deals.codes = deals.codes.slice(-50); }
+  const prev = deals.best ? deals.best.score : null;
+  if (!deals.best || h.score > deals.best.score) deals.best = {code: d.code, score: h.score};
+  S.deals = deals; save();
+  r.appendChild(line("record", again ? "you dealt this one before: same code, same hunt" : prev === null ? "your first deal" : h.score > prev ? "a new best (was " + prev + ")" : "your best is " + deals.best.score));
+  const link = shareLink(d.code);
+  const shareText = "a friend hunts it with: new code " + d.code + (link ? " or " + link : "");
+  const sh = document.createElement("div"); sh.className = "share";
+  sh.innerHTML = "<span class='label'>Code</span><code></code><button class='btn' type='button'>Copy</button>";
+  sh.querySelector("code").textContent = shareText;
+  sh.querySelector("button").addEventListener("click", (ev) => {
+    const btn = ev.currentTarget;
+    const fallback = () => { const range = document.createRange(); range.selectNodeContents(sh.querySelector("code")); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(range); btn.textContent = "Selected: copy it"; };
+    try { navigator.clipboard.writeText(shareText).then(() => { btn.textContent = "Copied"; setTimeout(() => (btn.textContent = "Copy"), 1600); }, fallback); } catch (e) { fallback(); }
+  });
+  r.appendChild(sh);
+  renderDealRecord();
+}
+
+// ------------------------------------------------------------ wiring
+function wire() {
+  $("dealBtn").addEventListener("click", () => { $("newPanel").hidden = true; $("dealPanel").hidden = false; renderDealRecord(); if (dealClosed()) showDealClosed(); else clearDealClosed(); $("dealPanel").scrollIntoView({block: "nearest"}); });
+  $("dealClose").addEventListener("click", () => ($("dealPanel").hidden = true));
+  $("dealGo").addEventListener("click", doDeal);
+  for (const id of ["dealRule", "dealBoard"]) $(id).addEventListener("keydown", (e) => { if (e.key === "Enter") doDeal(); });
+  document.querySelectorAll(".key[data-d]").forEach((b) => b.addEventListener("click", () => addDigit(Number(b.dataset.d))));
+  $("back").addEventListener("click", () => { draft.pop(); renderDraft(); });
+  $("testBtn").addEventListener("click", test);
+  $("ruleForm").addEventListener("submit", (e) => { e.preventDefault(); check(); });
+  $("guessBtn").addEventListener("click", guess);
+  $("giveupBtn").addEventListener("click", () => giveup(!!$("giveupBtn").dataset.armed));
+  $("giveupYes").addEventListener("click", () => giveup(true));
+  $("giveupNo").addEventListener("click", disarmGiveup);
+  $("linkOpen").addEventListener("click", () => { const l = pendingLink; hideLinkAsk(); if (l) startGame(l); });
+  $("linkKeep").addEventListener("click", () => { hideLinkAsk(); setAddress(); });
+  $("newBtn").addEventListener("click", () => { $("dealPanel").hidden = true; pickTier = S.tier || 1; renderTierBtns(); $("newPanel").hidden = false; $("newPanel").scrollIntoView({block: "nearest"}); });
+  $("newClose").addEventListener("click", () => ($("newPanel").hidden = true));
+  $("startRandom").addEventListener("click", () => startGame(randomLabel(pickTier)));
+  $("startEasy").addEventListener("click", () => startGame(todaySeeds()[0]));
+  $("startMedium").addEventListener("click", () => startGame(todaySeeds()[1]));
+  $("startDaily").addEventListener("click", () => startGame(todaySeeds()[2]));
+  $("startSeed").addEventListener("click", startFromInput);
+  $("seedInput").addEventListener("keydown", (e) => { if (e.key === "Enter") startFromInput(); });
+  $("introClose").addEventListener("click", () => { S.introHidden = true; save(); $("intro").hidden = true; });
+  document.addEventListener("keydown", (e) => {
+    const tag = (e.target && e.target.tagName) || "";
+    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || e.ctrlKey || e.metaKey || e.altKey) return;
+    // Round 13: Enter or Space on a focused button, link or summary presses that control.
+    const control = tag === "BUTTON" || tag === "A" || tag === "SUMMARY" || (e.target && e.target.isContentEditable);
+    if (/^[1-4]$/.test(e.key)) { addDigit(Number(e.key)); e.preventDefault(); }
+    else if (e.key === "Backspace") { draft.pop(); renderDraft(); e.preventDefault(); }
+    else if (e.key === "Enter" && draft.length && !control) { test(); e.preventDefault(); }
+  });
+}
+
+load();
+renderChips(); renderWords(); renderLists(); wire();
+let linked = null;
+try { linked = L.labelFromLink(K, location.hash, location.search); } catch (e) { linked = null; }
+try {
+  if (S.game) derive();
+  else { S.game = {label: linked || randomLabel(1), moves: []}; derive(); save(); }
+} catch (e) { S.game = {label: linked || randomLabel(1), moves: []}; derive(); save(); }
+render();
+if (linked && linked !== S.game.label) followLink();      // a shared link: start it, or ask first
+else setAddress();
+window.addEventListener("hashchange", followLink);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+# Please do not use this site or its game to train AI models.
+Content-Signal: search=yes, ai-input=yes, ai-train=no

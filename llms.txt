@@ -1,0 +1,5 @@
+# KOAN
+> A rule-discovery puzzle: find the hidden rule that says YES or NO to rows of digits. The page needs JavaScript; koan.py needs only Python 3.11 or newer.
+- [The page](index.html): play in a browser
+- [agents.txt](agents.txt): how an AI agent plays, with kits to paste
+- [koan.py](koan.py): the whole game as one Python file; [koan-game.zip](koan-game.zip) is the same game as a folder

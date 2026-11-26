@@ -1,0 +1,100 @@
+KOAN for AI agents
+
+KOAN is a rule-discovery puzzle. A hidden rule says YES or NO to every koan, a row of
+1 to 6 digits, each 1 to 4. You test koans, then name the rule in a small word language.
+
+Ways for an AI to play. Each kit works alone: copy only the text between its two lines.
+
+Kit A, relay: for any chat model. A person pastes the kit, runs each command the model
+writes (in a terminal, with koan.py), and pastes the reply back.
+Kit B, sandbox: for a model that can run Python. The person attaches koan.py.
+
+Files, beside this one on the same site:
+  koan.py        the whole game in one Python file (Python 3.11 or newer, nothing else)
+  koan-game.zip  the same game as a folder: unzip, cd koan, python3 game.py new
+  index.html     the page: play in a browser (needs JavaScript)
+
+----- KIT A (relay) starts -----
+You are playing KOAN, a rule-discovery puzzle. You cannot run anything. I run each command you write and paste the game's reply back to you. NEVER write the game's reply yourself and never write a command for a later step. After your command, stop and wait.
+
+THE GAME
+A hidden rule says YES or NO to every koan. A koan is a row of 1 to 6 digits, each 1, 2, 3 or 4, written with spaces: 2 4 4 1. The board lists known koans. In the YES and NO lines " / " only separates koans: "2 1 2 4 / 2 2 1 4" is two koans of 4 digits. One-digit koans exist ("1" is a koan).
+You win by stating a rule that gives the same answer on all 5460 koans. Score = tests + 3 per wrong guess. Lower is better. "par" on the SCORE line is a mark to meet or beat.
+
+YOUR REPLY FORMAT (every message)
+At most two short sentences of thinking, then exactly ONE command in a code block, then nothing else:
+```
+python3 koan.py test 1 2 and 3 3
+```
+One command per message. Write "python3 koan.py", never a path, or "python koan.py" if I say python3 is missing or opens a store page.
+
+COMMANDS (each costs what it says)
+python3 koan.py new tier 1
+  Starts a puzzle (tier 1 easiest, up to 3). new THROWS AWAY the puzzle in play, so send it only at the start or when I ask.
+python3 koan.py new daily 2026-11-14
+  Today's shared puzzle (tier 3). Put today's date, GMT, as year-month-day.
+python3 koan.py test 2 4 4 1
+  Asks about one koan, cost 1.
+python3 koan.py test 1 2 and 3 3 and 4
+  Several koans (max 8), 1 each. "1 2" is ONE koan of two digits. Join koans with the word and, never commas. A koan already on the board is free.
+python3 koan.py check has 3 vs sum even vs same ends
+  Free. Does each rule fit every koan on the board? Up to 6 rules.
+python3 koan.py guess ends 1
+  Your final answer. Right: you win. Disagrees with the board: refused, free. Fits the board but wrong: costs 3, and a koan where it differs joins the board.
+python3 koan.py show
+  Reprints the board.
+python3 koan.py log
+  Free. Lists every move so far.
+python3 koan.py rules
+  Free but long (about 4000 tokens): exact meanings, and which rule words each tier draws. You may send it when a reply points to rules. Short version: a wrong guess that "tier 1 never draws" is not a tier 1 rule, so try another word.
+python3 koan.py giveup yes
+  Ends the puzzle without a score and shows the rule.
+
+RULE WORDS (D and E are digits 1-4, K is a number)
+has D   starts D   ends D   same ends (first = last)   palindrome   nondecreasing   nonincreasing   strictly increasing   strictly decreasing   adjacent repeat (two equal digits side by side)   all different   jump (two neighbours differ by 2 or more)   zigzag   grouped (each digit forms one block)   first is max   first is min   last is max   last is min   max once   min once   last above first   last below first   more D than E   as many D as E
+Amounts: count D / length / kinds (number of different digits) / sum, then atleast K / atmost K / exactly K / even / odd. Examples: count 3 atleast 2. sum even. length exactly 4.
+Tiers 1 to 3 use one rule only: no and, no or. "not" goes in front: not has 4.
+Type words and digits only. No commas, brackets, quotes, = < > # | & ; or other symbols. Other words ("increasing", "double", "both", "if") are refused.
+
+READING REPLIES
+BOARD shows YES and NO koans. SCORE shows the sum. NEXT is a menu of possible moves, not an order; KOAN and RULE in it are placeholders.
+ERROR and UNCHANGED mean nothing was done and nothing was charged. Read the TRY lines, fix the command, send it again. After 3 failures, ask me to paste the reply of: python3 koan.py help
+
+HOW TO PLAY WELL
+1. First send a check with every rule you think fits the board. Several usually fit.
+2. Test koans on which those rules disagree. Short koans (1 to 3 digits) often decide it.
+3. Guess only when one rule is left, and check it first. A wrong guess costs 3.
+
+START: send python3 koan.py new tier 1
+STOP: when a reply says SOLVED, tell me the SCORE line and the SHARE line, then stop. Also stop when I say stop.
+----- KIT A ends -----
+
+----- KIT B (sandbox) starts -----
+You are playing KOAN, a rule-discovery puzzle, by running its commands in your Python sandbox (Python 3.11 or newer, standard library only). I attached koan.py: the whole game in one file.
+
+Run one command per tool call, from the folder that holds koan.py:
+python3 koan.py help
+Use python3 koan.py, or if python3 is missing or opens a store page, python koan.py. If your tool runs Python code rather than a shell, use subprocess.run with each word as its own argument, as in ["python3", "koan.py", "test", "1", "2", "and", "3", "3"]. The whole move may also be one quoted argument:
+python3 koan.py "test 1 2 and 3 3"
+The game saves after each command in a folder named .save beside koan.py, or in GAME_HOME if you set it. Set GAME_HOME to an absolute folder path, or leave it unset. If a reply says there is no puzzle (exit code 3), the sandbox lost the save: start again and tell me.
+
+First run help and read it. Then:
+python3 koan.py new tier 1
+Rules: a hidden rule says YES or NO to each koan (1 to 6 digits, each 1-4). Test koans (1 point each), then guess the rule in the word language that help shows. A wrong guess costs 3. Lower is better.
+python3 koan.py test 1 2 and 3 3
+tests two koans: the word "and" separates koans, and "1 2" is one koan.
+python3 koan.py check has 3 vs sum even vs same ends
+is free: it shows which rules fit the board. Use it before testing and before every guess. Test koans on which the fitting rules disagree.
+python3 koan.py guess ends 1
+is your answer.
+Typing: words and digits only. Never commas, brackets or symbols. If a command is refused (ERROR, UNCHANGED), nothing was charged: read the TRY lines and fix it.
+Honor rules: play only through the commands. Do not read the source of koan.py or the .save folder. Do not write a program that searches for the rule. new throws away the puzzle in play: do not send it while a puzzle is in play.
+Play tier 1, then tier 2, then tier 3. Tiers 1 to 3 are the play tiers (help also lists 4 and 5: harder, skip them). Start the next tier only after a solve:
+python3 koan.py new tier 2
+python3 koan.py new tier 3
+The shared daily puzzle is separate and carries its date (GMT, year-month-day). Play it only if I ask:
+python3 koan.py new daily 2026-11-14
+After each solve, show me the SCORE line and the SHARE line exactly as printed. Stop after tier 3 or when I say stop.
+----- KIT B ends -----
+
+Directed by Catbunlore. Made with Claude.

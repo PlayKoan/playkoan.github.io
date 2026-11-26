@@ -1,0 +1,20 @@
+{
+  "functions": {
+    "api/play.py": {
+      "includeFiles": "api/_lib/**",
+      "maxDuration": 10
+    }
+  },
+  "rewrites": [
+    { "source": "/play", "destination": "/api/play" },
+    { "source": "/play/:path*", "destination": "/api/play?_path=:path*" }
+  ],
+  "headers": [
+    {
+      "source": "/play(.*)",
+      "headers": [
+        { "key": "X-Robots-Tag", "value": "noindex" }
+      ]
+    }
+  ]
+}
