@@ -676,20 +676,23 @@ OWN_TEMPLATE = "or add /guess-WORDS to ADDRESS, as in /guess-has-2-or-ends-1"
 
 
 def state_page(base, tier, family_words):
+    """The tier's rules. Each link is a free check: a visitor that opens only printed
+    addresses (Gemini, 2026-11-26) can then check before it guesses. A check that fits the
+    board prints that rule's guess link (game_page)."""
     fams = _families(tier)
-    out = wrap("RULES", "tier %d hides one of these %d. Each link guesses (wrong costs 3); "
-               "check in place of guess is free." % (tier, sum(len(v) for v in fams.values())),
-               width=78)
+    out = wrap("RULES", "tier %d hides one of these %d. Each link checks a rule against the "
+               "board, free; if it fits, that page links its guess (wrong costs 3)."
+               % (tier, sum(len(v) for v in fams.values())), width=78)
     family = " ".join(family_words)
     if family:
         if family not in fams:
             raise BadAddress("no rule group named %s" % shown(seg(family_words)), base + "/state")
         out.append(line("GROUP", family))
-        out += [line("", "%s/guess-%s" % (base, seg(t.split()))) for t in fams[family]]
+        out += [line("", "%s/check-%s" % (base, seg(t.split()))) for t in fams[family]]
     elif tier == 1:
         for fam, texts in fams.items():
             out.append(line("GROUP", fam))
-            out += [line("", "%s/guess-%s" % (base, seg(t.split()))) for t in texts]
+            out += [line("", "%s/check-%s" % (base, seg(t.split()))) for t in texts]
     else:
         out.append(line("GROUPS", "free pages, one per group:"))
         out += [line("", "%s/state-%s  (%d)" % (base, seg(f.split()), len(v)))
@@ -814,6 +817,10 @@ def game_page(play_url, page_url, label, moves, sub, root=None, fits=FITS_DEFAUL
         out.append(line("NEXT", tail))
     else:
         out.append(line("ADDRESS", here))
+        if (moves and moves[-1][0] == "check" and len(moves[-1]) > 1
+                and re.search(r"(?m)^CHECK +fits all ", r["text"])):
+            out.append(line("GUESS", "this rule, wrong costs 3: %s/guess-%s"
+                            % (here, seg(moves[-1][1:]))))
         out += playing_links(play_url, label, kept, gs, moves[-1] if moves else None, fit)
         if not moves and listed:
             out.append(switch_line(fits, game_url(other, label)))
