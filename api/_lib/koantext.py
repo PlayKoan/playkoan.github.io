@@ -19,6 +19,7 @@ site-src/api/play.py only move bytes.
 
 import contextlib
 import copy
+import functools
 import io
 import json
 import os
@@ -439,8 +440,8 @@ HOW = ("A hidden rule says YES or NO to every koan, a row of 1 to 6 digits from 
        "A right guess ends the game; a wrong one costs 3. Low score wins. Rules look like: "
        "has 3, ends 2 or ends 4, has 1 and not ends 3, not palindrome. A rule may use and, "
        "or use or, but not both.")
-VISIT = ("Play by opening addresses. Each page lists the next ones; each is this game plus "
-         "one move. Nothing is stored. Pages marked free change nothing.")
+VISIT = ("Open the addresses each page prints: every move has one, so you never need to write "
+         "one. Nothing is stored. Pages marked free change nothing.")
 HONOR = "Scores are on the honor system: any address can be reopened."
 
 
@@ -470,7 +471,8 @@ def door_page(play_url, page_url, date, switch=None):
 
 def how_page(play_url, page_url, switch=None):
     out = wrap("HOW", HOW) + wrap("VISIT", VISIT) + [line("HONOR", HONOR)]
-    out += wrap("MOVES", "Each move adds one part to a game's address, words joined by -. "
+    out += wrap("SHORTCUT", "For agents that can open addresses they write: each move adds one "
+                "part to a game's address, words joined by -. "
                 "1234 (or test-1234) tests the koan 1 2 3 4; test-12-and-34 tests two. "
                 "check-has-2 is free. guess-has-1-and-not-ends-3 guesses. giveup-yes ends "
                 "the game. Example: /play/1-12345/11/guess-adjacent-repeat")
@@ -558,7 +560,15 @@ def _test_links(base, qs):
     return ["%s/%s" % (base, koan_str(U[q]).replace(" ", "")) for q in qs]
 
 
-TEMPLATE = "/1234 (test) /check-has-2 /guess-ends-1-or-has-3 (words joined by -)"
+DIGIT_WORDS = {3: "three", 4: "four", 5: "five", 6: "six"}
+
+
+@functools.lru_cache(maxsize=None)
+def _koans_starting(n, prefix):
+    """The koans of n digits that start with the digits in prefix, in order (16 of them when
+    prefix has n-2 digits)."""
+    return [q for q in range(len(U))
+            if len(U[q]) == n and koan_str(U[q]).replace(" ", "").startswith(prefix)]
 
 
 def _block(key, header, links):
@@ -633,16 +643,22 @@ def sub_page(play_url, label, kept, gs, sub, board, fit=None, switch=None):
             out.append(line("MORE", "three-digit koans, by first digit, free pages:"))
             out += [line("", "%s/more-3-%d" % (base, d)) for d in (1, 2, 3, 4)]
             return out
-        if len(arg) == 2 and arg[0] == "3" and arg[1] in ("1", "2", "3", "4"):
-            first = 20 + 16 * (int(arg[1]) - 1)
-            qs = _shortest_untested(gs, 16, first, first + 16)
-            out += _block("TEST", "three-digit koans starting %s, not on the board, cost 1:"
-                          % arg[1], _test_links(base, qs))
-            out += wrap("LONGER", "koans of 4 to 6 digits: add /1234 (your digits) to "
-                        + base, width=200)
+        if (len(arg) == 2 and arg[0] in ("3", "4", "5", "6")
+                and re.fullmatch(r"[1-4]{%d}" % (int(arg[0]) - 2), arg[1])):
+            # Every koan has a printed link: a koan of n digits is on the page for its first
+            # n-2 digits, reached from more-2 one free page per digit.
+            n, prefix = int(arg[0]), arg[1]
+            qs = [q for q in _koans_starting(n, prefix) if q not in gs.board]
+            out += _block("TEST", "%s-digit koans starting %s, not on the board, cost 1:"
+                          % (DIGIT_WORDS[n], prefix), _test_links(base, qs))
+            if n < 6:
+                out.append(line("LONGER", "%s-digit koans starting %s, by the next digit, "
+                                "free pages:" % (DIGIT_WORDS[n + 1], prefix)))
+                out += [line("", "%s/more-%d-%s%d" % (base, n + 1, prefix, d))
+                        for d in (1, 2, 3, 4)]
             return out
-        raise BadAddress("more takes 2, or 3 and a first digit, as in more-3-1",
-                         base + "/more-2")
+        raise BadAddress("more takes 2, or a length from 3 to 6 and the first digits, as in "
+                         "more-3-1 or more-5-123", base + "/more-2")
     if head == "state" and tier <= 2 and len(sub) == 1:
         return out + state_page(base, tier, sub[0][1:])
     if head == "state" and len(sub) == 1 and len(sub[0]) == 1:
@@ -672,9 +688,6 @@ def _families(tier):
     return fams
 
 
-OWN_TEMPLATE = "or add /guess-WORDS to ADDRESS, as in /guess-has-2-or-ends-1"
-
-
 def state_page(base, tier, family_words):
     """The tier's rules. Each link is a free check: a visitor that opens only printed
     addresses (Gemini, 2026-11-26) can then check before it guesses. A check that fits the
@@ -698,7 +711,6 @@ def state_page(base, tier, family_words):
         out += [line("", "%s/state-%s  (%d)" % (base, seg(f.split()), len(v)))
                 for f, v in fams.items()]
     out.append(line("OWN", "a rule of your own, word by word: %s/draft-guess" % base))
-    out.append(line("", OWN_TEMPLATE))
     return out
 
 
@@ -719,7 +731,6 @@ def fits_page(base, tier, family_words, fit):
     out = wrap("FITS", head, width=78)
     out += [line("", "%s/guess-%s" % (base, seg(e.text.split()))) for e in fit]
     out.append(line("OWN", "a rule of your own, word by word: %s/draft-guess" % base))
-    out.append(line("", OWN_TEMPLATE))
     return out
 
 
@@ -754,7 +765,6 @@ def draft_page(base, sub):
         out.append(line("ADD", "one %s condition, free pages:" % fam))
         out += [line("", "%s-%s" % (here, seg(t.split()))) for t in fams[fam]]
         out.append(line("BACK", here))
-        out.append(line("OWN", OWN_TEMPLATE))
         return out
     open_end = not body or body[-1] in CONNECTORS
     if open_end:
@@ -767,7 +777,6 @@ def draft_page(base, sub):
         # The draft ends in a condition: only a joining word can follow.
         out.append(line("ADD", "a joining word, then a condition, free pages:"))
         out += [line("", "%s-%s" % (here, c)) for c in ("and", "or")]
-    out.append(line("OWN", OWN_TEMPLATE))
     return out
 
 
@@ -788,6 +797,7 @@ def game_page(play_url, page_url, label, moves, sub, root=None, fits=FITS_DEFAUL
     out = []
     if not moves and not sub:
         out += wrap("HOW", HOW) + wrap("VISIT", VISIT)
+        out.append(line("HELP", "the rules, and shortcuts: %s/how" % play_url))
     else:
         out += reminder(play_url)
     out.append(line("HONOR", HONOR))
@@ -827,8 +837,7 @@ def game_page(play_url, page_url, label, moves, sub, root=None, fits=FITS_DEFAUL
         elif not moves and fits:
             out.append(line("FITS", "tier 5 has no list of rules to fit: this puzzle plays "
                             "the plain way."))
-        out.append(line("NEXT", "open one address above, or add your own move to ADDRESS:"))
-        out.append(line("NEXT", TEMPLATE))
+        out.append(line("NEXT", "open one address above"))
     return "\n".join(out) + "\n"
 
 

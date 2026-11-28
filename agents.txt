@@ -102,6 +102,7 @@ After each solve, show me the SCORE line and the SHARE line exactly as printed. 
 ----- KIT C (link) starts -----
 Open https://playkoan.vercel.app/play and read it. Each page shows the game's reply and lists the addresses of
 the next moves: open one address per move, and stop when a page says SOLVED.
+Every move has a printed address, so you never need to write one.
 ----- KIT C ends -----
 
 Directed by Catbunlore. Made with Claude.
