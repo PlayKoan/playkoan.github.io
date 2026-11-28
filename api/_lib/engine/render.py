@@ -447,14 +447,15 @@ def guess_result(gs, rule, mask, verdict, board_size, drawable=None):
 
 
 def _records(history, game):
-    plays, best, date = seed_record_of(history, game["label"])
+    plays, best, date, helped = seed_record_of(history, game["label"])
     this = "this deal" if game["label"].startswith("D-") else "this seed"
     if plays <= 1:
         first = "%s: first play" % this
     elif best is None:
         first = "%s: %d plays, none solved" % (this, plays)
     else:
-        first = "%s: %d plays, best %d (%s)" % (this, plays, best, date)
+        first = "%s: %d plays, best %d (%s%s)" % (this, plays, best, date,
+                                                  ", assisted" if helped else "")
     counted, scores = tier_record_of(history, game["tier"])
     tier = game["tier"]
     if game["label"].startswith("D-"):
@@ -544,6 +545,11 @@ def reveal(gs, guess_rule, solver_n, crux, escape_q, history, hunt=None):
         out += line("MEANS", rule_gloss(secret.rule))
         d = gs.score - par
         rel = "at par" if d == 0 else ("%d under par" % -d if d < 0 else "%d over par" % d)
+        if game["assisted"]:
+            # Round 15: help (scripts, or the list of rules that still fit) makes a comparison
+            # with par meaningless, so an assisted solve does not claim one. The GAME line
+            # says why: it ends in `assisted`.
+            rel = "not compared"
         out += line("SCORE", "%s   par %d, %s%s" % (score_sum(gs), par, rel, solver))
     else:
         out += line("GAVEUP", "the puzzle is over and is not scored")
@@ -584,7 +590,8 @@ def reveal(gs, guess_rule, solver_n, crux, escape_q, history, hunt=None):
     daily = game["label"].startswith("daily-")
     # `new` alone keeps the tier; a solve at or under par also offers the next tier; tier 5
     # points to the dealer's chair (round 9)
-    up = guess_rule is not None and gs.score <= par and tier < OPEN_TIER
+    up = (guess_rule is not None and gs.score <= par and tier < OPEN_TIER
+          and not game["assisted"])          # round 15: help earns no comparison with par
     if daily:
         nxt = "new / new tier 4" if up else "new"
     elif tier == OPEN_TIER:
@@ -761,6 +768,8 @@ def stats(history, deals=None):
         last = max(dailies, key=lambda h: h["id"])
         outcome = {"solved": "solved with score %s" % last["score"], "gaveup": "gave up",
                    "abandoned": "abandoned"}[last["outcome"]]
+        if last["assisted"] and last["outcome"] == "solved":
+            outcome += ", assisted"             # round 15: an assisted score says so
         out += line("DAILY", "%d played, %d solved, last %s %s" % (
             len(dailies), sum(1 for h in dailies if h["outcome"] == "solved"),
             last["label"][len("daily-"):], outcome))

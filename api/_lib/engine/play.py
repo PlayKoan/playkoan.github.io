@@ -362,14 +362,18 @@ def median(scores):
 
 
 def seed_record(history, label):
-    """(plays, best score or None, date of best) for RECORD line 1."""
+    """(plays, best score or None, date of best, best is assisted) for RECORD line 1. The best
+    is over the solves without help; only when every solve had help is it an assisted one
+    (round 15), and then it says so."""
     same = [h for h in history if h["label"] == label]
     solved = [h for h in same if h["outcome"] == "solved"]
     if not solved:
-        return len(same), None, None
-    best = min(h["score"] for h in solved)
-    date = min(h["ended"] for h in solved if h["score"] == best)
-    return len(same), best, date
+        return len(same), None, None, False
+    plain = [h for h in solved if not h["assisted"]]
+    pool = plain or solved
+    best = min(h["score"] for h in pool)
+    date = min(h["ended"] for h in pool if h["score"] == best)
+    return len(same), best, date, not plain
 
 
 def tier_record(history, tier):

@@ -288,15 +288,18 @@ def play(label, moves, extra=None, assisted=False):
                 "extra_text": None, "failed_new": True}
     kept, before = [], outs[0][2]
     last = (outs[0][0], outs[0][1])
+    last_kept = False
     for (code, text, game), owner in zip(outs[1:], owners[1:]):
         if owner == "extra":
             continue
-        if game != before:
+        last_kept = game != before
+        if last_kept:
             kept.append(moves[owner])
         before = game
         last = (code, text)
     game = outs[-2][2] if extra else outs[-1][2]
     return {"text": last[1], "code": last[0], "game": game, "kept": kept,
+            "last_kept": last_kept,      # the last move changed the game (not a repeat)
             "extra_text": outs[-1][1] if extra else None, "failed_new": False}
 
 
@@ -348,7 +351,7 @@ def tidy(text, share=None, base=None, rules=None):
                 continue
             ln = line("TRY", "%s/%s" % (base, move))
         ln = ln.replace("assisted game: scripts are allowed and it is recorded separately",
-                        "assisted game: FITS is on, so a solve has no SHARE line")
+                        "assisted game (FITS): no SHARE line, no comparison with par")
         ln = ln.replace("Start another with new.", "Open ANOTHER below.")
         ln = ln.replace("To do it: giveup yes", "To do it: open the GIVEUP link below.")
         ln = re.sub(r"python \S+\.py ", "terminal game: ", ln)
@@ -792,8 +795,18 @@ def game_page(play_url, page_url, label, moves, sub, root=None, fits=FITS_DEFAUL
     game, kept = r["game"], r["kept"]
     label = game["label"]
     gs = replay(game)
-    fit = fitting(gs) if fits and listed and not gs.over else None
+    # Round 15: the list of rules that still fit opens only after the first test. At the
+    # start it nearly names the rule (three or fewer in 151 of 200 tier-1 starts), and Gemini
+    # guessed from it without testing; after a test it is bookkeeping, which is its purpose.
+    tested = gs.tests >= 1
+    offer = listed and tested
+    fit = fitting(gs) if fits and offer and not gs.over else None
     other = mode_url(root, not fits)
+    not_yet = None
+    if fits and listed and not tested:      # the note, and still the plain way back
+        not_yet = "\n".join([
+            line("FITS", "the list of rules that still fit opens after your first test"),
+            switch_line(fits, game_url(other, label, r["kept"], sub))])
     out = []
     if not moves and not sub:
         out += wrap("HOW", HOW) + wrap("VISIT", VISIT)
@@ -809,7 +822,7 @@ def game_page(play_url, page_url, label, moves, sub, root=None, fits=FITS_DEFAUL
             out += [board, ""] + end_links(play_url, page_url, label, kept, gs)
             out.append(line("NEXT", "this game is over: open one address above"))
             return "\n".join(out) + "\n"
-        switch = switch_line(fits, game_url(other, label, kept, sub)) if listed else None
+        switch = switch_line(fits, game_url(other, label, kept, sub)) if offer else not_yet
         out += sub_page(play_url, label, kept, gs, sub, compact_board(board), fit, switch)
         out.append(line("NEXT", "open one address above. This page was free and changed "
                         "nothing."))
@@ -832,9 +845,13 @@ def game_page(play_url, page_url, label, moves, sub, root=None, fits=FITS_DEFAUL
             out.append(line("GUESS", "this rule, wrong costs 3: %s/guess-%s"
                             % (here, seg(moves[-1][1:]))))
         out += playing_links(play_url, label, kept, gs, moves[-1] if moves else None, fit)
-        if not moves and listed:
-            out.append(switch_line(fits, game_url(other, label)))
-        elif not moves and fits:
+        first_test = (offer and r["last_kept"] and kept[-1][0] == "test"
+                      and not any(m[0] == "test" for m in kept[:-1]))
+        if first_test:                      # offered once, on the page after the first test
+            out.append(switch_line(fits, game_url(other, label, kept)))
+        elif not_yet:
+            out.append(not_yet)
+        elif not moves and fits and not listed:
             out.append(line("FITS", "tier 5 has no list of rules to fit: this puzzle plays "
                             "the plain way."))
         out.append(line("NEXT", "open one address above"))
@@ -850,11 +867,15 @@ def handle(target, play_url, page_url="", date=None):
         kind, label, moves, sub, fits = parse_target(target)
         play_url = mode_url(root, fits)       # every link below keeps the FITS choice
         other = mode_url(root, not fits)
+        # Round 15: the door and the how page never offer the list (it opens after a game's
+        # first test); with the list already chosen they offer the plain way back.
         if kind == "door":
-            body = door_page(play_url, page_url, date or today_utc(), switch_line(fits, other))
+            body = door_page(play_url, page_url, date or today_utc(),
+                             switch_line(fits, other) if fits else None)
             cache = CACHE_DOOR
         elif kind == "how":
-            body = how_page(play_url, page_url, switch_line(fits, other + "/how"))
+            body = how_page(play_url, page_url,
+                            switch_line(fits, other + "/how") if fits else None)
         elif kind == "rules":
             body = rules_page(play_url, label)
         else:
